@@ -53,35 +53,35 @@ interface Provider {
 interface Model {
   id: string;
   name: string;
-  model_id: string;
-  provider_id: string;
-  provider_name?: string;
-  upstream_model: string;
-  supports_vision: boolean;
-  supports_image_gen: boolean;
-  max_tokens: number;
+  modelId: string;
+  providerId: string;
+  providerName?: string;
+  upstreamModel: string;
+  supportsVision: boolean;
+  supportsImageGen: boolean;
+  maxTokens: number;
   status: "active" | "inactive";
 }
 
 interface ModelForm {
   name: string;
-  model_id: string;
-  provider_id: string;
-  upstream_model: string;
-  supports_vision: boolean;
-  supports_image_gen: boolean;
-  max_tokens: number;
+  modelId: string;
+  providerId: string;
+  upstreamModel: string;
+  supportsVision: boolean;
+  supportsImageGen: boolean;
+  maxTokens: number;
   status: "active" | "inactive";
 }
 
 const emptyForm: ModelForm = {
   name: "",
-  model_id: "",
-  provider_id: "",
-  upstream_model: "",
-  supports_vision: false,
-  supports_image_gen: false,
-  max_tokens: 4096,
+  modelId: "",
+  providerId: "",
+  upstreamModel: "",
+  supportsVision: false,
+  supportsImageGen: false,
+  maxTokens: 4096,
   status: "active",
 };
 
@@ -138,12 +138,12 @@ export default function ModelsPage() {
     setEditingId(model.id);
     setForm({
       name: model.name,
-      model_id: model.model_id,
-      provider_id: model.provider_id,
-      upstream_model: model.upstream_model,
-      supports_vision: model.supports_vision,
-      supports_image_gen: model.supports_image_gen,
-      max_tokens: model.max_tokens,
+      modelId: model.modelId,
+      providerId: model.providerId,
+      upstreamModel: model.upstreamModel,
+      supportsVision: model.supportsVision,
+      supportsImageGen: model.supportsImageGen,
+      maxTokens: model.maxTokens,
       status: model.status,
     });
     setDialogOpen(true);
@@ -299,23 +299,23 @@ export default function ModelsPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">{m.name}</TableCell>
-                      <TableCell className="font-mono text-xs">{m.model_id}</TableCell>
-                      <TableCell>{m.provider_name ?? providerName(m.provider_id)}</TableCell>
+                      <TableCell className="font-mono text-xs">{m.modelId}</TableCell>
+                      <TableCell>{m.providerName ?? providerName(m.providerId)}</TableCell>
                       <TableCell>
-                        {m.supports_vision ? (
+                        {m.supportsVision ? (
                           <Check className="h-4 w-4 text-green-600" />
                         ) : (
                           <X className="h-4 w-4 text-muted-foreground" />
                         )}
                       </TableCell>
                       <TableCell>
-                        {m.supports_image_gen ? (
+                        {m.supportsImageGen ? (
                           <Check className="h-4 w-4 text-green-600" />
                         ) : (
                           <X className="h-4 w-4 text-muted-foreground" />
                         )}
                       </TableCell>
-                      <TableCell>{m.max_tokens.toLocaleString()}</TableCell>
+                      <TableCell>{m.maxTokens.toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge
                           className={
@@ -371,16 +371,16 @@ export default function ModelsPage() {
               <Label htmlFor="m-model_id">模型 ID</Label>
               <Input
                 id="m-model_id"
-                value={form.model_id}
-                onChange={(e) => setForm({ ...form, model_id: e.target.value })}
+                value={form.modelId}
+                onChange={(e) => setForm({ ...form, modelId: e.target.value })}
                 placeholder="gpt-4o"
               />
             </div>
             <div className="grid gap-2">
               <Label>服务商</Label>
               <Select
-                value={form.provider_id}
-                onValueChange={(val: string | null) => setForm({ ...form, provider_id: val || "" })}
+                value={form.providerId}
+                onValueChange={(val: string | null) => setForm({ ...form, providerId: val || "" })}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="选择服务商" />
@@ -398,9 +398,9 @@ export default function ModelsPage() {
               <Label htmlFor="m-upstream">上游模型</Label>
               <Input
                 id="m-upstream"
-                value={form.upstream_model}
+                value={form.upstreamModel}
                 onChange={(e) =>
-                  setForm({ ...form, upstream_model: e.target.value })
+                  setForm({ ...form, upstreamModel: e.target.value })
                 }
                 placeholder="gpt-4o-2024-08-06"
               />
@@ -408,18 +408,18 @@ export default function ModelsPage() {
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <Switch
-                  checked={form.supports_vision}
+                  checked={form.supportsVision}
                   onCheckedChange={(checked) =>
-                    setForm({ ...form, supports_vision: !!checked })
+                    setForm({ ...form, supportsVision: !!checked })
                   }
                 />
                 <Label>视觉</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
-                  checked={form.supports_image_gen}
+                  checked={form.supportsImageGen}
                   onCheckedChange={(checked) =>
-                    setForm({ ...form, supports_image_gen: !!checked })
+                    setForm({ ...form, supportsImageGen: !!checked })
                   }
                 />
                 <Label>图片生成</Label>
@@ -430,9 +430,9 @@ export default function ModelsPage() {
               <Input
                 id="m-max_tokens"
                 type="number"
-                value={form.max_tokens}
+                value={form.maxTokens}
                 onChange={(e) =>
-                  setForm({ ...form, max_tokens: parseInt(e.target.value) || 0 })
+                  setForm({ ...form, maxTokens: parseInt(e.target.value) || 0 })
                 }
               />
             </div>

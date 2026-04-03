@@ -49,35 +49,35 @@ interface ApiKey {
   name: string;
   key: string;
   key_preview: string;
-  allowed_models: string[];
-  rate_limit: number;
-  monthly_quota: number;
-  used_quota: number;
+  allowedModels: string[];
+  rateLimit: number;
+  monthlyQuota: number;
+  usedQuota: number;
   status: "active" | "inactive" | "revoked";
-  last_used: string | null;
-  expires_at: string | null;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
 }
 
 interface Model {
   id: string;
   name: string;
-  model_id: string;
+  modelId: string;
 }
 
 interface KeyForm {
   name: string;
-  allowed_models: string[];
-  rate_limit: number;
-  monthly_quota: number;
-  expires_at: string;
+  allowedModels: string[];
+  rateLimit: number;
+  monthlyQuota: number;
+  expiresAt: string;
 }
 
 const emptyForm: KeyForm = {
   name: "",
-  allowed_models: [],
-  rate_limit: 60,
-  monthly_quota: 0,
-  expires_at: "",
+  allowedModels: [],
+  rateLimit: 60,
+  monthlyQuota: 0,
+  expiresAt: "",
 };
 
 export default function KeysPage() {
@@ -135,10 +135,10 @@ export default function KeysPage() {
     setEditingId(key.id);
     setForm({
       name: key.name,
-      allowed_models: key.allowed_models,
-      rate_limit: key.rate_limit,
-      monthly_quota: key.monthly_quota,
-      expires_at: key.expires_at ?? "",
+      allowedModels: key.allowedModels,
+      rateLimit: key.rateLimit,
+      monthlyQuota: key.monthlyQuota,
+      expiresAt: key.expiresAt ?? "",
     });
     setDialogOpen(true);
   }
@@ -186,14 +186,14 @@ export default function KeysPage() {
     setTimeout(() => setCopiedId(null), 2000);
   }
 
-  function toggleModel(modelId: string) {
+  function toggleModel(mid: string) {
     setForm((prev) => {
-      const has = prev.allowed_models.includes(modelId);
+      const has = prev.allowedModels.includes(mid);
       return {
         ...prev,
-        allowed_models: has
-          ? prev.allowed_models.filter((m) => m !== modelId)
-          : [...prev.allowed_models, modelId],
+        allowedModels: has
+          ? prev.allowedModels.filter((m) => m !== mid)
+          : [...prev.allowedModels, mid],
       };
     });
   }
@@ -275,35 +275,35 @@ export default function KeysPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {k.allowed_models.length === 0 ? (
+                          {k.allowedModels.length === 0 ? (
                             <span className="text-xs text-muted-foreground">全部</span>
                           ) : (
-                            k.allowed_models.slice(0, 3).map((m) => (
+                            k.allowedModels.slice(0, 3).map((m) => (
                               <Badge key={m} variant="secondary" className="text-xs">
                                 {m}
                               </Badge>
                             ))
                           )}
-                          {k.allowed_models.length > 3 && (
+                          {k.allowedModels.length > 3 && (
                             <Badge variant="secondary" className="text-xs">
-                              +{k.allowed_models.length - 3}
+                              +{k.allowedModels.length - 3}
                             </Badge>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>{k.rate_limit}次/分钟</TableCell>
+                      <TableCell>{k.rateLimit}次/分钟</TableCell>
                       <TableCell>
-                        {k.monthly_quota > 0 ? (
+                        {k.monthlyQuota > 0 ? (
                           <div className="w-24">
                             <div className="mb-1 flex justify-between text-xs">
-                              <span>{k.used_quota.toLocaleString()}</span>
-                              <span>{k.monthly_quota.toLocaleString()}</span>
+                              <span>{k.usedQuota.toLocaleString()}</span>
+                              <span>{k.monthlyQuota.toLocaleString()}</span>
                             </div>
                             <div className="h-1.5 w-full rounded-full bg-muted">
                               <div
                                 className="h-1.5 rounded-full bg-primary transition-all"
                                 style={{
-                                  width: `${quotaPercent(k.used_quota, k.monthly_quota)}%`,
+                                  width: `${quotaPercent(k.usedQuota, k.monthlyQuota)}%`,
                                 }}
                               />
                             </div>
@@ -326,8 +326,8 @@ export default function KeysPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {k.last_used
-                          ? new Date(k.last_used).toLocaleString()
+                        {k.lastUsedAt
+                          ? new Date(k.lastUsedAt).toLocaleString()
                           : "从未"}
                       </TableCell>
                       <TableCell className="text-right">
@@ -383,13 +383,13 @@ export default function KeysPage() {
                     >
                       <input
                         type="checkbox"
-                        checked={form.allowed_models.includes(m.model_id)}
-                        onChange={() => toggleModel(m.model_id)}
+                        checked={form.allowedModels.includes(m.modelId)}
+                        onChange={() => toggleModel(m.modelId)}
                         className="rounded border-gray-300"
                       />
                       <span className="text-sm">{m.name}</span>
                       <span className="font-mono text-xs text-muted-foreground">
-                        {m.model_id}
+                        {m.modelId}
                       </span>
                     </label>
                   ))
@@ -405,9 +405,9 @@ export default function KeysPage() {
                 <Input
                   id="k-rate"
                   type="number"
-                  value={form.rate_limit}
+                  value={form.rateLimit}
                   onChange={(e) =>
-                    setForm({ ...form, rate_limit: parseInt(e.target.value) || 0 })
+                    setForm({ ...form, rateLimit: parseInt(e.target.value) || 0 })
                   }
                 />
               </div>
@@ -416,11 +416,11 @@ export default function KeysPage() {
                 <Input
                   id="k-quota"
                   type="number"
-                  value={form.monthly_quota}
+                  value={form.monthlyQuota}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      monthly_quota: parseInt(e.target.value) || 0,
+                      monthlyQuota: parseInt(e.target.value) || 0,
                     })
                   }
                 />
@@ -431,8 +431,8 @@ export default function KeysPage() {
               <Input
                 id="k-expires"
                 type="date"
-                value={form.expires_at}
-                onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                value={form.expiresAt}
+                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
                 留空则永不过期。

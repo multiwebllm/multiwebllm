@@ -48,21 +48,21 @@ interface Provider {
   id: string;
   name: string;
   slug: string;
-  base_url: string;
-  auth_type: "cookie" | "token" | "api_key";
-  auth_data: string;
+  baseUrl: string;
+  authType: "cookie" | "token" | "api_key";
+  authData: string;
   status: "active" | "inactive" | "error";
-  last_checked: string | null;
+  lastCheckedAt: string | null;
 }
 
-type ProviderForm = Omit<Provider, "id" | "last_checked">;
+type ProviderForm = Omit<Provider, "id" | "lastCheckedAt">;
 
 const emptyForm: ProviderForm = {
   name: "",
   slug: "",
-  base_url: "",
-  auth_type: "api_key",
-  auth_data: "",
+  baseUrl: "",
+  authType: "api_key",
+  authData: "",
   status: "active",
 };
 
@@ -122,9 +122,9 @@ export default function ProvidersPage() {
     setForm({
       name: provider.name,
       slug: provider.slug,
-      base_url: provider.base_url,
-      auth_type: provider.auth_type,
-      auth_data: provider.auth_data,
+      baseUrl: provider.baseUrl,
+      authType: provider.authType,
+      authData: provider.authData,
       status: provider.status,
     });
     setDialogOpen(true);
@@ -226,10 +226,10 @@ export default function ProvidersPage() {
                       <TableCell>
                         <Badge className={statusColor(p.status)}>{p.status === "active" ? "运行中" : p.status === "inactive" ? "未启用" : "异常"}</Badge>
                       </TableCell>
-                      <TableCell>{p.auth_type}</TableCell>
+                      <TableCell>{p.authType}</TableCell>
                       <TableCell>
-                        {p.last_checked
-                          ? new Date(p.last_checked).toLocaleString()
+                        {p.lastCheckedAt
+                          ? new Date(p.lastCheckedAt).toLocaleString()
                           : "从未"}
                       </TableCell>
                       <TableCell className="text-right">
@@ -307,20 +307,20 @@ export default function ProvidersPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="base_url">基础地址</Label>
+              <Label htmlFor="baseUrl">基础地址</Label>
               <Input
-                id="base_url"
-                value={form.base_url}
-                onChange={(e) => setForm({ ...form, base_url: e.target.value })}
+                id="baseUrl"
+                value={form.baseUrl}
+                onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
                 placeholder="https://api.openai.com/v1"
               />
             </div>
             <div className="grid gap-2">
               <Label>认证方式</Label>
               <Select
-                value={form.auth_type}
+                value={form.authType}
                 onValueChange={(val) =>
-                  setForm({ ...form, auth_type: val as ProviderForm["auth_type"] })
+                  setForm({ ...form, authType: val as ProviderForm["authType"] })
                 }
               >
                 <SelectTrigger className="w-full">
@@ -334,11 +334,11 @@ export default function ProvidersPage() {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="auth_data">认证数据 (JSON)</Label>
+              <Label htmlFor="authData">认证数据 (JSON)</Label>
               <Textarea
-                id="auth_data"
-                value={form.auth_data}
-                onChange={(e) => setForm({ ...form, auth_data: e.target.value })}
+                id="authData"
+                value={form.authData}
+                onChange={(e) => setForm({ ...form, authData: e.target.value })}
                 placeholder='{"key": "sk-..."}'
                 rows={3}
               />
