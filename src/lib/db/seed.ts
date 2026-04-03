@@ -65,10 +65,12 @@ const defaultModels = [
   { providerSlug: "chatgpt", name: "DALL-E 3", modelId: "dall-e-3", upstreamModel: "dall-e-3", maxTokens: 4096, supportsImageGen: true },
 
   // Claude (2026)
+  { providerSlug: "claude", name: "Claude Opus 4.6", modelId: "claude-opus-4.6", upstreamModel: "claude-opus-4-6-20250826", maxTokens: 1000000, supportsVision: true },
+  { providerSlug: "claude", name: "Claude Sonnet 4.6", modelId: "claude-sonnet-4.6", upstreamModel: "claude-sonnet-4-6-20250826", maxTokens: 1000000, supportsVision: true },
   { providerSlug: "claude", name: "Claude Opus 4", modelId: "claude-opus-4", upstreamModel: "claude-opus-4-20250514", maxTokens: 200000, supportsVision: true },
   { providerSlug: "claude", name: "Claude Sonnet 4", modelId: "claude-sonnet-4", upstreamModel: "claude-sonnet-4-20250514", maxTokens: 200000, supportsVision: true },
   { providerSlug: "claude", name: "Claude Sonnet 4 (Thinking)", modelId: "claude-sonnet-4-thinking", upstreamModel: "claude-sonnet-4-20250514-thinking", maxTokens: 200000, supportsVision: true },
-  { providerSlug: "claude", name: "Claude Haiku 3.5", modelId: "claude-haiku-3.5", upstreamModel: "claude-3-5-haiku-20241022", maxTokens: 200000, supportsVision: true },
+  { providerSlug: "claude", name: "Claude Haiku 4.5", modelId: "claude-haiku-4.5", upstreamModel: "claude-haiku-4-5-20251001", maxTokens: 200000, supportsVision: true },
 
   // Gemini (2026)
   { providerSlug: "gemini", name: "Gemini 2.5 Pro", modelId: "gemini-2.5-pro", upstreamModel: "gemini-2.5-pro", maxTokens: 1000000, supportsVision: true },

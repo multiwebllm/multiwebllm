@@ -56,11 +56,16 @@ export default function DashboardLayout({
         {/* Sidebar */}
         <aside className="flex w-64 flex-col border-r bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
           {/* Logo */}
-          <div className="flex h-14 items-center gap-2.5 border-b px-5">
-            <div className="flex h-8 w-8 items-center justify-center bg-blue-600">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-lg font-bold tracking-tight text-blue-600">MultiWebLLM</span>
+          <div className="flex h-14 items-center justify-between border-b px-5">
+            <a href="https://multiwebllm.io" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+              <div className="flex h-8 w-8 items-center justify-center bg-blue-600">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-bold tracking-tight text-blue-600 leading-tight">MultiWebLLM</span>
+                <span className="text-[10px] text-muted-foreground/50 leading-tight">v0.0.1</span>
+              </div>
+            </a>
           </div>
 
           {/* Navigation */}
