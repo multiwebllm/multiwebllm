@@ -57,10 +57,10 @@ export default function DashboardLayout({
         <aside className="flex w-64 flex-col border-r bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
           {/* Logo */}
           <div className="flex h-14 items-center gap-2.5 border-b px-5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+            <div className="flex h-8 w-8 items-center justify-center bg-blue-600">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">MultiWebLLM</span>
+            <span className="text-lg font-bold tracking-tight text-blue-600">MultiWebLLM</span>
           </div>
 
           {/* Navigation */}
@@ -80,7 +80,7 @@ export default function DashboardLayout({
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                     isActive
-                      ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-sm shadow-blue-500/25"
+                      ? "bg-blue-600 text-white"
                       : "text-muted-foreground hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950 dark:hover:text-blue-300"
                   )}
                 >

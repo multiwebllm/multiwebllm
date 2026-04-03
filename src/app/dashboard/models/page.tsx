@@ -440,8 +440,8 @@ export default function ModelsPage() {
               <Label>状态</Label>
               <Select
                 value={form.status}
-                onValueChange={(val) =>
-                  setForm({ ...form, status: val as ModelForm["status"] })
+                onValueChange={(val: string | null) =>
+                  setForm({ ...form, status: (val || "active") as ModelForm["status"] })
                 }
               >
                 <SelectTrigger className="w-full">
