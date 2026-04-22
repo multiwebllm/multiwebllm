@@ -3,11 +3,18 @@ import { db } from "@/lib/db";
 import { validateAdmin } from "@/lib/auth";
 import { sql } from "drizzle-orm";
 import os from "os";
+import fs from "fs/promises";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { createClient } from "redis";
 
 const execAsync = promisify(exec);
+
+// 在 Docker 容器里运行时, 挂载宿主 /proc 到 /host/proc, 宿主根到 /host/rootfs
+// 通过 env 切换读取路径, 否则默认读容器本身
+const HOST_PROC = process.env.HOST_PROC || "/proc";
+const HOST_ROOT = process.env.HOST_ROOT || "/";
+const HOST_HOSTNAME = process.env.HOST_HOSTNAME;
 
 // 存储上次的网络数据用于计算速率
 let lastNetworkStats: { rx: number; tx: number; time: number } | null = null;
@@ -57,7 +64,7 @@ async function getDiskUsage(): Promise<{
   totalGB: string 
 }> {
   try {
-    const { stdout } = await execAsync("df -k / | tail -1");
+    const { stdout } = await execAsync(`df -k ${HOST_ROOT} | tail -1`);
     const parts = stdout.trim().split(/\s+/);
     if (parts.length >= 6) {
       const total = parseInt(parts[1], 10) * 1024;
@@ -122,18 +129,21 @@ async function getNetworkStats(): Promise<{
   totalTxGB: string;
 }> {
   try {
-    const { stdout } = await execAsync("cat /proc/net/dev");
+    const stdout = await fs.readFile(`${HOST_PROC}/net/dev`, "utf8");
     const lines = stdout.split("\n");
     let rxBytes = 0;
     let txBytes = 0;
-    
+
+    // 只统计物理/上联网卡,排除 lo 回环 + docker/veth/br- 等虚拟网桥
     for (const line of lines) {
-      if (line.includes("eth") || line.includes("ens") || line.includes("enp") || line.includes("wlan") || line.includes("lo")) {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 9) {
-          rxBytes += parseInt(parts[1], 10) || 0;
-          txBytes += parseInt(parts[9], 10) || 0;
-        }
+      const m = line.match(/^\s*([^:\s]+):\s+(.+)$/);
+      if (!m) continue;
+      const iface = m[1];
+      if (iface === "lo" || iface.startsWith("docker") || iface.startsWith("br-") || iface.startsWith("veth") || iface.startsWith("tap")) continue;
+      const parts = m[2].trim().split(/\s+/);
+      if (parts.length >= 9) {
+        rxBytes += parseInt(parts[0], 10) || 0;
+        txBytes += parseInt(parts[8], 10) || 0;
       }
     }
     
@@ -279,13 +289,24 @@ async function getRedisInfo(): Promise<{
   }
 }
 
-// 获取进程信息
+// 获取进程信息 - 读取 /proc 下的数字目录计数, 统计宿主/容器内全部进程
 async function getProcessInfo(): Promise<{ total: number; running: number }> {
   try {
-    const { stdout } = await execAsync("ps aux | wc -l");
-    const total = parseInt(stdout.trim(), 10) - 1;
-    const { stdout: runningStdout } = await execAsync("ps aux | grep -c 'R+' || echo 0");
-    const running = parseInt(runningStdout.trim(), 10) || Math.floor(total / 4);
+    const entries = await fs.readdir(HOST_PROC);
+    let total = 0;
+    let running = 0;
+    for (const entry of entries) {
+      if (!/^\d+$/.test(entry)) continue;
+      total++;
+      try {
+        const stat = await fs.readFile(`${HOST_PROC}/${entry}/stat`, "utf8");
+        // 第 3 列是 state: R=running, S=sleeping, D=disk-wait 等
+        const m = stat.match(/\)\s+(\S)/);
+        if (m && m[1] === "R") running++;
+      } catch {
+        // 进程可能刚退出, 忽略
+      }
+    }
     return { total, running };
   } catch {
     return { total: 0, running: 0 };
@@ -293,7 +314,7 @@ async function getProcessInfo(): Promise<{ total: number; running: number }> {
 }
 
 function getHostname(): string {
-  return os.hostname();
+  return HOST_HOSTNAME || os.hostname();
 }
 
 function getPlatform(): string {

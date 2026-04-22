@@ -7,6 +7,13 @@ services:
     env_file: .env
     environment:
       - REDIS_URL=${REDIS_URL:-redis://multiwebllm-redis:6379}
+      # 系统监控读宿主数据(docker volume ro 挂载)
+      - HOST_PROC=/host/proc
+      - HOST_ROOT=/host/rootfs
+      - HOST_HOSTNAME=${HOST_HOSTNAME:-}
+    volumes:
+      - /proc:/host/proc:ro
+      - /:/host/rootfs:ro,rslave
     depends_on:
       multiwebllm-db:
         condition: service_healthy
