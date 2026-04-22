@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class DeepSeekProvider extends BaseProvider {
@@ -121,5 +122,28 @@ export class DeepSeekProvider extends BaseProvider {
     } catch {
       return false;
     }
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    return [
+      {
+        id: "deepseek-chat",
+        name: "DeepSeek-V3",
+        description: "DeepSeek 对话模型",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 64000,
+      },
+      {
+        id: "deepseek-reasoner",
+        name: "DeepSeek-R1",
+        description: "DeepSeek 推理模型",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 64000,
+      },
+    ];
   }
 }

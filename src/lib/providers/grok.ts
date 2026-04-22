@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class GrokProvider extends BaseProvider {
@@ -106,5 +107,55 @@ export class GrokProvider extends BaseProvider {
     } catch {
       return false;
     }
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    return [
+      {
+        id: "grok-2",
+        name: "Grok 2",
+        description: "xAI's general-purpose conversational AI",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "grok-2-vision",
+        name: "Grok 2 Vision",
+        description: "Grok 2 with vision capabilities",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "grok-3",
+        name: "Grok 3",
+        description: "Advanced reasoning model",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "grok-4",
+        name: "Grok 4",
+        description: "xAI's smartest model with native tool use",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 200000,
+      },
+      {
+        id: "grok-4.1",
+        name: "Grok 4.1",
+        description: "Latest model with reduced hallucinations",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 200000,
+      },
+    ];
   }
 }

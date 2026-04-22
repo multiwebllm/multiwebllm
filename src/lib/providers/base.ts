@@ -30,6 +30,16 @@ export interface QuotaInfo {
   raw?: Record<string, unknown>;
 }
 
+export interface ProviderModel {
+  id: string;
+  name: string;
+  description?: string;
+  supportsVision?: boolean;
+  supportsImageGen?: boolean;
+  maxTokens?: number;
+  contextWindow?: number;
+}
+
 export interface ProviderConfig {
   authData: Record<string, unknown>;
   baseUrl?: string;
@@ -47,6 +57,12 @@ export abstract class BaseProvider {
   abstract checkQuota(): Promise<QuotaInfo>;
 
   abstract validateAuth(): Promise<boolean>;
+
+  /**
+   * 获取服务商支持的模型列表
+   * 如果服务商不支持获取模型列表，返回空数组
+   */
+  abstract fetchModels(): Promise<ProviderModel[]>;
 
   protected createSSEStream(
     generator: () => AsyncGenerator<SSEChunk>

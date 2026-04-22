@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class MinimaxProvider extends BaseProvider {
@@ -133,5 +134,46 @@ export class MinimaxProvider extends BaseProvider {
     } catch {
       return false;
     }
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    return [
+      {
+        id: "minimax-text-01",
+        name: "MiniMax-Text-01",
+        description: "Next-generation text model with vision capabilities",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "minimax-m2",
+        name: "MiniMax-M2",
+        description: "Efficient model for the agentic era",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "minimax-m2.1",
+        name: "MiniMax-M2.1",
+        description: "Polyglot programming mastery model",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "minimax-m2.5",
+        name: "MiniMax-M2.5",
+        description: "SOTA model for coding and productivity",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+    ];
   }
 }

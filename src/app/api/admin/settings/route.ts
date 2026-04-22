@@ -18,6 +18,16 @@ async function writeSettings(settings: Record<string, unknown>) {
   await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
 }
 
+export async function GET(request: NextRequest) {
+  if (!(await validateAdmin(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const settings = await readSettings();
+  // 不暴露敏感字段
+  const { adminPasswordOverride, twoFactorSecret, twoFactorPendingSecret, ...safeSettings } = settings;
+  return NextResponse.json(safeSettings);
+}
+
 export async function POST(request: NextRequest) {
   if (!(await validateAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

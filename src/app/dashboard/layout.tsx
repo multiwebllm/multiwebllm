@@ -7,13 +7,14 @@ import {
   Unplug,
   BrainCircuit,
   KeySquare,
-  TrendingUp,
   SlidersHorizontal,
   LogOut,
   Sparkles,
   Shield,
   ArrowUpCircle,
   X,
+  Monitor,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -29,10 +30,11 @@ const VERSION_CHECK_URL = "https://api.multiwebllm.io/v1/version";
 
 const navItems = [
   { href: "/dashboard", label: "控制台", icon: LayoutDashboard },
+  { href: "/dashboard/monitoring", label: "运维监控", icon: Monitor },
+  { href: "/dashboard/records", label: "使用记录", icon: ScrollText },
   { href: "/dashboard/providers", label: "服务商管理", icon: Unplug },
   { href: "/dashboard/models", label: "模型配置", icon: BrainCircuit },
   { href: "/dashboard/keys", label: "API 密钥", icon: KeySquare },
-  { href: "/dashboard/usage", label: "用量统计", icon: TrendingUp },
   { href: "/dashboard/settings", label: "系统设置", icon: SlidersHorizontal },
 ];
 

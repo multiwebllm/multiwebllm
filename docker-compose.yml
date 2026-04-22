@@ -1,37 +1,58 @@
 services:
-  app:
+  multiwebllm-app:
+    container_name: multiwebllm-app
     build: .
     ports:
       - "127.0.0.1:3000:3000"
     env_file: .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://multiwebllm-redis:6379}
     depends_on:
-      postgres:
+      multiwebllm-db:
+        condition: service_healthy
+      multiwebllm-redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - aiproxy-net
+      - multiwebllm-net
 
-  postgres:
+  multiwebllm-db:
+    container_name: multiwebllm-db
     image: postgres:16-alpine
-    # No host port - only accessible within Docker network
     volumes:
-      - aiproxy-pgdata:/var/lib/postgresql/data
+      - multiwebllm-pgdata:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: aiproxy
-      POSTGRES_USER: aiproxy
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-aiproxy_secret}
+      POSTGRES_DB: multiwebllm
+      POSTGRES_USER: multiwebllm
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-multiwebllm_secret}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aiproxy"]
+      test: ["CMD-SHELL", "pg_isready -U multiwebllm"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - aiproxy-net
+      - multiwebllm-net
+
+  multiwebllm-redis:
+    container_name: multiwebllm-redis
+    image: redis:8-alpine
+    volumes:
+      - multiwebllm-redisdata:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - multiwebllm-net
 
 networks:
-  aiproxy-net:
+  multiwebllm-net:
     driver: bridge
 
 volumes:
-  aiproxy-pgdata:
+  multiwebllm-pgdata:
+  multiwebllm-redisdata:

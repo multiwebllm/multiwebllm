@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Check } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Check, ShieldCheck, ShieldOff, Copy } from "lucide-react";
 
 interface Provider {
   id: string;
@@ -61,6 +62,17 @@ export default function SettingsPage() {
   const [cookieData, setCookieData] = useState("");
   const [cookieState, setCookieState] = useState<SaveState>(defaultSaveState);
 
+  // 2FA
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [twoFASetupData, setTwoFASetupData] = useState<{
+    qrCode: string;
+    secret: string;
+  } | null>(null);
+  const [twoFACode, setTwoFACode] = useState("");
+  const [twoFAError, setTwoFAError] = useState("");
+  const [twoFASuccess, setTwoFASuccess] = useState("");
+
   const fetchProviders = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/providers");
@@ -84,6 +96,7 @@ export default function SettingsPage() {
           setAdminUsername(data.admin_username);
           setNewUsername(data.admin_username);
         }
+        setTwoFAEnabled(!!data.twoFactorEnabled);
       }
     } catch {
       // ignore
@@ -172,6 +185,94 @@ export default function SettingsPage() {
       { provider_id: selectedProvider, cookies: cookieData },
       setCookieState
     );
+  }
+
+  async function handle2FASetup() {
+    setTwoFALoading(true);
+    setTwoFAError("");
+    setTwoFASuccess("");
+    try {
+      const res = await fetch("/api/admin/auth/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setup" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTwoFASetupData({ qrCode: data.qrCode, secret: data.secret });
+      } else {
+        setTwoFAError(data.error || "生成二维码失败");
+      }
+    } catch {
+      setTwoFAError("网络错误");
+    } finally {
+      setTwoFALoading(false);
+    }
+  }
+
+  async function handle2FAEnable() {
+    if (!twoFACode || twoFACode.length !== 6) {
+      setTwoFAError("请输入 6 位验证码");
+      return;
+    }
+    setTwoFALoading(true);
+    setTwoFAError("");
+    try {
+      const res = await fetch("/api/admin/auth/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify_and_enable", code: twoFACode }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTwoFAEnabled(true);
+        setTwoFASetupData(null);
+        setTwoFACode("");
+        setTwoFASuccess("双因素认证已成功启用");
+        setTimeout(() => setTwoFASuccess(""), 3000);
+      } else {
+        setTwoFAError(data.error || "验证失败");
+      }
+    } catch {
+      setTwoFAError("网络错误");
+    } finally {
+      setTwoFALoading(false);
+    }
+  }
+
+  async function handle2FADisable() {
+    if (!twoFACode || twoFACode.length !== 6) {
+      setTwoFAError("请输入 6 位验证码以确认关闭");
+      return;
+    }
+    setTwoFALoading(true);
+    setTwoFAError("");
+    try {
+      const res = await fetch("/api/admin/auth/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disable", code: twoFACode }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTwoFAEnabled(false);
+        setTwoFACode("");
+        setTwoFASuccess("双因素认证已关闭");
+        setTimeout(() => setTwoFASuccess(""), 3000);
+      } else {
+        setTwoFAError(data.error || "验证失败");
+      }
+    } catch {
+      setTwoFAError("网络错误");
+    } finally {
+      setTwoFALoading(false);
+    }
+  }
+
+  function handleCopySecret() {
+    if (twoFASetupData?.secret) {
+      navigator.clipboard.writeText(twoFASetupData.secret);
+    }
   }
 
   function SaveButton({
@@ -269,6 +370,148 @@ export default function SettingsPage() {
             <p className="text-sm text-destructive">{passwordError}</p>
           )}
           <SaveButton state={passwordState} onClick={handlePasswordSave} />
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Two-Factor Authentication */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                {twoFAEnabled ? (
+                  <ShieldCheck className="h-5 w-5 text-green-600" />
+                ) : (
+                  <ShieldOff className="h-5 w-5 text-muted-foreground" />
+                )}
+                双因素认证 (2FA)
+              </CardTitle>
+              <CardDescription className="mt-1">
+                使用 Google Authenticator 等应用进行二次验证，增强账户安全性。
+              </CardDescription>
+            </div>
+            <Badge variant={twoFAEnabled ? "default" : "secondary"}>
+              {twoFAEnabled ? "已启用" : "未启用"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {twoFASuccess && (
+            <p className="text-sm text-green-600 flex items-center gap-1">
+              <Check className="h-4 w-4" />
+              {twoFASuccess}
+            </p>
+          )}
+          {twoFAError && (
+            <p className="text-sm text-destructive">{twoFAError}</p>
+          )}
+
+          {!twoFAEnabled && !twoFASetupData && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                启用后，每次登录除密码外还需输入动态验证码。
+              </p>
+              <Button onClick={handle2FASetup} disabled={twoFALoading}>
+                {twoFALoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                启用 2FA
+              </Button>
+            </div>
+          )}
+
+          {!twoFAEnabled && twoFASetupData && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  1. 使用 Google Authenticator 扫描二维码：
+                </p>
+                <div className="flex justify-center p-4 bg-white rounded-lg w-fit mx-auto">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={twoFASetupData.qrCode}
+                    alt="2FA QR Code"
+                    width={200}
+                    height={200}
+                  />
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  2. 或手动输入密钥：
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="px-3 py-2 bg-muted rounded text-sm font-mono tracking-wider">
+                    {twoFASetupData.secret}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopySecret}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  3. 输入验证码完成绑定：
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={twoFACode}
+                    onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="6 位验证码"
+                    className="w-40 text-center tracking-widest"
+                  />
+                  <Button onClick={handle2FAEnable} disabled={twoFALoading}>
+                    {twoFALoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    验证并启用
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setTwoFASetupData(null);
+                      setTwoFACode("");
+                      setTwoFAError("");
+                    }}
+                  >
+                    取消
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {twoFAEnabled && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                关闭 2FA 需要验证当前动态码。
+              </p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={twoFACode}
+                  onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="6 位验证码"
+                  className="w-40 text-center tracking-widest"
+                />
+                <Button
+                  variant="destructive"
+                  onClick={handle2FADisable}
+                  disabled={twoFALoading}
+                >
+                  {twoFALoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  关闭 2FA
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

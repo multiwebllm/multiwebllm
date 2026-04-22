@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class ChatGPTProvider extends BaseProvider {
@@ -159,5 +160,57 @@ export class ChatGPTProvider extends BaseProvider {
   async validateAuth(): Promise<boolean> {
     const token = await this.getAccessToken();
     return !!token;
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    // ChatGPT 网页版没有标准的 /v1/models API
+    // 返回常用的内置模型列表
+    return [
+      {
+        id: "gpt-4o",
+        name: "GPT-4o",
+        description: "OpenAI 最新的多模态模型",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "gpt-4o-mini",
+        name: "GPT-4o Mini",
+        description: "轻量级多模态模型",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "o1",
+        name: "o1",
+        description: "OpenAI 推理模型",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "o1-mini",
+        name: "o1-mini",
+        description: "轻量级推理模型",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "o3-mini",
+        name: "o3-mini",
+        description: "最新的轻量级推理模型",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+    ];
   }
 }

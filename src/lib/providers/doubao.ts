@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class DouBaoProvider extends BaseProvider {
@@ -135,5 +136,55 @@ export class DouBaoProvider extends BaseProvider {
     } catch {
       return false;
     }
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    return [
+      {
+        id: "doubao-pro",
+        name: "Doubao Pro",
+        description: "ByteDance's professional large language model",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "doubao-lite",
+        name: "Doubao Lite",
+        description: "Lightweight model for fast responses",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 128000,
+      },
+      {
+        id: "doubao-1.5-pro",
+        name: "Doubao 1.5 Pro",
+        description: "Third-generation MoE architecture model",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "doubao-1.5-pro-256k",
+        name: "Doubao 1.5 Pro 256K",
+        description: "Extended context version of Doubao 1.5 Pro",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "doubao-seed-code",
+        name: "Doubao Seed Code",
+        description: "Specialized model for agentic coding tasks",
+        supportsVision: false,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+    ];
   }
 }

@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class KimiProvider extends BaseProvider {
@@ -156,5 +157,37 @@ export class KimiProvider extends BaseProvider {
     } catch {
       return false;
     }
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    return [
+      {
+        id: "kimi-k1.5",
+        name: "Kimi K1.5",
+        description: "Moonshot's multimodal model with long-context reasoning",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "kimi-k2",
+        name: "Kimi K2",
+        description: "1T parameter MoE model for coding and agentic tasks",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+      {
+        id: "kimi-k2.5",
+        name: "Kimi K2.5",
+        description: "Trillion-parameter native multimodal model",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 256000,
+      },
+    ];
   }
 }

@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class ClaudeProvider extends BaseProvider {
@@ -154,5 +155,55 @@ export class ClaudeProvider extends BaseProvider {
   async validateAuth(): Promise<boolean> {
     const orgId = await this.getOrgId();
     return !!orgId;
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    return [
+      {
+        id: "claude-3-opus",
+        name: "Claude 3 Opus",
+        description: "Anthropic's most powerful model for complex tasks",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 200000,
+      },
+      {
+        id: "claude-3-sonnet",
+        name: "Claude 3 Sonnet",
+        description: "Balanced performance and speed",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 200000,
+      },
+      {
+        id: "claude-3-haiku",
+        name: "Claude 3 Haiku",
+        description: "Fastest model for lightweight actions",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 200000,
+      },
+      {
+        id: "claude-3.5-sonnet",
+        name: "Claude 3.5 Sonnet",
+        description: "Improved coding and reasoning capabilities",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 8192,
+        contextWindow: 200000,
+      },
+      {
+        id: "claude-3.5-haiku",
+        name: "Claude 3.5 Haiku",
+        description: "Fastest 3.5 model with near-frontier performance",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 4096,
+        contextWindow: 200000,
+      },
+    ];
   }
 }

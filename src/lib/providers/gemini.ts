@@ -3,6 +3,7 @@ import {
   ChatOptions,
   QuotaInfo,
   SSEChunk,
+  ProviderModel,
 } from "./base";
 
 export class GeminiProvider extends BaseProvider {
@@ -121,5 +122,55 @@ export class GeminiProvider extends BaseProvider {
     } catch {
       return false;
     }
+  }
+
+  async fetchModels(): Promise<ProviderModel[]> {
+    return [
+      {
+        id: "gemini-1.5-pro",
+        name: "Gemini 1.5 Pro",
+        description: "Advanced model for complex reasoning and coding",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 8192,
+        contextWindow: 2000000,
+      },
+      {
+        id: "gemini-1.5-flash",
+        name: "Gemini 1.5 Flash",
+        description: "Fast model for high-frequency tasks",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 8192,
+        contextWindow: 1000000,
+      },
+      {
+        id: "gemini-2.0-flash",
+        name: "Gemini 2.0 Flash",
+        description: "Next-gen fast model with enhanced capabilities",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 8192,
+        contextWindow: 1000000,
+      },
+      {
+        id: "gemini-2.5-pro",
+        name: "Gemini 2.5 Pro",
+        description: "Most intelligent model with advanced reasoning",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 8192,
+        contextWindow: 1000000,
+      },
+      {
+        id: "gemini-2.5-flash",
+        name: "Gemini 2.5 Flash",
+        description: "Balanced cost and capability for production",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 8192,
+        contextWindow: 1000000,
+      },
+    ];
   }
 }

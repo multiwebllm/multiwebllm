@@ -43,6 +43,7 @@ import {
   Loader2,
   Check,
   X,
+  RefreshCw,
 } from "lucide-react";
 
 interface Provider {
@@ -96,6 +97,8 @@ export default function ModelsPage() {
   const [form, setForm] = useState<ModelForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{success: boolean; message: string} | null>(null);
 
   const fetchModels = useCallback(async () => {
     try {
@@ -217,11 +220,47 @@ export default function ModelsPage() {
   const providerName = (id: string) =>
     providers.find((p) => p.id === id)?.name ?? id;
 
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/admin/models/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSyncResult({
+          success: true,
+          message: `同步完成：新增 ${data.summary.totalAdded} 个，更新 ${data.summary.totalUpdated} 个模型`,
+        });
+        await fetchModels();
+      } else {
+        setSyncResult({
+          success: false,
+          message: data.error || "同步失败",
+        });
+      }
+    } catch {
+      setSyncResult({
+        success: false,
+        message: "网络错误，请稍后重试",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">模型配置</h1>
         <div className="flex items-center gap-2">
+          {syncResult && (
+            <span className={`text-sm ${syncResult.success ? "text-green-600" : "text-red-600"}`}>
+              {syncResult.message}
+            </span>
+          )}
           {selected.size > 0 && (
             <>
               <Button
@@ -240,6 +279,15 @@ export default function ModelsPage() {
               </Button>
             </>
           )}
+          <Button
+            variant="outline"
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <RefreshCw className="mr-2 h-4 w-4" />
+            同步模型
+          </Button>
           <Button onClick={openAdd}>
             <Plus className="mr-2 h-4 w-4" />
             添加模型

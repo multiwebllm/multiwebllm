@@ -18,8 +18,8 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Do NOT protect /api/v1/* (those use API key auth)
-  // Do NOT protect /api/admin/auth (login endpoint)
-  if (pathname.startsWith("/api/v1") || pathname.startsWith("/api/admin/auth")) {
+  // Do NOT protect /api/admin/auth (login endpoint, but NOT /api/admin/auth/2fa which needs admin auth)
+  if (pathname.startsWith("/api/v1") || pathname === "/api/admin/auth") {
     return NextResponse.next();
   }
 
