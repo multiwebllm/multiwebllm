@@ -188,6 +188,15 @@ export class KimiProvider extends BaseProvider {
         maxTokens: 4096,
         contextWindow: 256000,
       },
+      {
+        id: "kimi-k2.6",
+        name: "Kimi K2.6",
+        description: "Moonshot K2.6 - 增强推理与长上下文",
+        supportsVision: true,
+        supportsImageGen: false,
+        maxTokens: 8192,
+        contextWindow: 256000,
+      },
     ];
   }
 }
