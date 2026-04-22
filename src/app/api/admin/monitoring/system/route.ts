@@ -129,7 +129,12 @@ async function getNetworkStats(): Promise<{
   totalTxGB: string;
 }> {
   try {
-    const stdout = await fs.readFile(`${HOST_PROC}/net/dev`, "utf8");
+    // /proc/net 是 per-netns 符号链接, 直接读挂载点走的还是容器 netns
+    // 读 $HOST_PROC/1/net/dev (宿主 PID 1 的 netns = 宿主主 netns)
+    const netDevPath = process.env.HOST_PROC
+      ? `${HOST_PROC}/1/net/dev`
+      : `${HOST_PROC}/net/dev`;
+    const stdout = await fs.readFile(netDevPath, "utf8");
     const lines = stdout.split("\n");
     let rxBytes = 0;
     let txBytes = 0;
