@@ -174,11 +174,9 @@ export class KimiProvider extends BaseProvider {
     const base = this.openApiBase;
     const upstreamModel = KimiProvider.MODEL_ALIAS[options.model] || options.model;
     const ua = this.CODING_UA;
-    // 注入默认采样参数以缓解 Kimi For Coding 在 Cursor Agent 模式下的 repetition loop
-    // 客户端显式传值时尊重其值, 未传时用这些默认
+    // Kimi For Coding 仅允许 presence_penalty/frequency_penalty = 0,
+    // 因此只用较低温度抑制 repetition. 客户端显式传 temperature 时优先.
     const temperature = options.temperature ?? 0.3;
-    const frequencyPenalty = 0.3;
-    const presencePenalty = 0.3;
     return this.createSSEStream(async function* (): AsyncGenerator<SSEChunk> {
       const upstream = await fetch(`${base}/chat/completions`, {
         method: "POST",
@@ -192,8 +190,6 @@ export class KimiProvider extends BaseProvider {
           messages: options.messages,
           stream: true,
           temperature,
-          frequency_penalty: frequencyPenalty,
-          presence_penalty: presencePenalty,
           ...(options.max_tokens != null ? { max_tokens: options.max_tokens } : {}),
         }),
       });
