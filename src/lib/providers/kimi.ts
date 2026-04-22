@@ -203,6 +203,8 @@ export class KimiProvider extends BaseProvider {
       const reader = upstream.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let inReasoning = false;
+      let reasoningOpened = false;
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -218,8 +220,33 @@ export class KimiProvider extends BaseProvider {
             const json = JSON.parse(data);
             const delta = json.choices?.[0]?.delta;
             const finishReason = json.choices?.[0]?.finish_reason;
-            if (delta?.content) yield { content: delta.content };
-            if (finishReason) yield { finishReason };
+            // Kimi For Coding 先发 reasoning_content 再发 content.
+            // 把 reasoning 包在 <think>...</think> 标签透传给客户端, Cursor/
+            // Cline 等 coding client 会按 markdown 折叠显示, 内容更完整.
+            const reasoning = delta?.reasoning_content as string | undefined;
+            const content = delta?.content as string | undefined;
+            if (reasoning) {
+              if (!reasoningOpened) {
+                yield { content: "<think>" };
+                reasoningOpened = true;
+              }
+              inReasoning = true;
+              yield { content: reasoning };
+            }
+            if (content) {
+              if (inReasoning) {
+                yield { content: "</think>\n\n" };
+                inReasoning = false;
+              }
+              yield { content };
+            }
+            if (finishReason) {
+              if (reasoningOpened && inReasoning) {
+                yield { content: "</think>\n\n" };
+                inReasoning = false;
+              }
+              yield { finishReason };
+            }
           } catch {
             // 非标准行忽略
           }
