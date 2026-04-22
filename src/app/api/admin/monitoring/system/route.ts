@@ -54,6 +54,57 @@ function getCpuUsage(): { percent: number; detail: string; cores: number } {
   };
 }
 
+// 读宿主 /proc/cpuinfo 提取 CPU 型号、物理核、逻辑核、频率
+async function getCpuInfo(): Promise<{
+  model: string;
+  physicalSockets: number;
+  physicalCores: number;
+  logicalCores: number;
+  frequencyMHz: number;
+}> {
+  try {
+    const txt = await fs.readFile(`${HOST_PROC}/cpuinfo`, "utf8");
+    const blocks = txt.split(/\n\n+/).filter(b => b.trim());
+    const physIds = new Set<string>();
+    const physCoreKeys = new Set<string>();
+    let model = "";
+    let maxMHz = 0;
+
+    for (const block of blocks) {
+      const entries: Record<string, string> = {};
+      for (const line of block.split("\n")) {
+        const i = line.indexOf(":");
+        if (i === -1) continue;
+        entries[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      }
+      if (!model && entries["model name"]) model = entries["model name"];
+      const mhz = parseFloat(entries["cpu MHz"] || "0");
+      if (mhz > maxMHz) maxMHz = mhz;
+      const physId = entries["physical id"] ?? "0";
+      const coreId = entries["core id"] ?? "";
+      physIds.add(physId);
+      physCoreKeys.add(`${physId}:${coreId}`);
+    }
+
+    return {
+      model: model || "Unknown CPU",
+      physicalSockets: physIds.size || 1,
+      physicalCores: physCoreKeys.size || blocks.length,
+      logicalCores: blocks.length,
+      frequencyMHz: Math.round(maxMHz),
+    };
+  } catch {
+    const cpus = os.cpus();
+    return {
+      model: cpus[0]?.model || "Unknown CPU",
+      physicalSockets: 1,
+      physicalCores: cpus.length,
+      logicalCores: cpus.length,
+      frequencyMHz: cpus[0]?.speed || 0,
+    };
+  }
+}
+
 // 获取磁盘使用率
 async function getDiskUsage(): Promise<{ 
   percent: number; 
@@ -339,8 +390,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [cpu, disk, load, network, redis, processes] = await Promise.all([
+  const [cpu, cpuInfo, disk, load, network, redis, processes] = await Promise.all([
     Promise.resolve(getCpuUsage()),
+    getCpuInfo(),
     getDiskUsage(),
     getLoadAverage(),
     getNetworkStats(),
@@ -401,6 +453,11 @@ export async function GET(request: NextRequest) {
     cpu: {
       percent: cpu.percent || Math.round(Math.random() * 20 + 5),
       cores: cpu.cores,
+      model: cpuInfo.model,
+      physicalSockets: cpuInfo.physicalSockets,
+      physicalCores: cpuInfo.physicalCores,
+      logicalCores: cpuInfo.logicalCores,
+      frequencyMHz: cpuInfo.frequencyMHz,
     },
     memory: {
       percent: memPercent,
