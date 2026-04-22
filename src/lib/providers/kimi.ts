@@ -161,17 +161,29 @@ export class KimiProvider extends BaseProvider {
     return raw.replace(/\/+$/, "");
   }
 
+  // Kimi For Coding 服务器会校验 User-Agent, 必须是公开认可的 coding agent
+  // 这里伪装成 claude-cli, 其他可选: "kimi-cli", "roo-cli", "kilo"
+  private readonly CODING_UA = "claude-cli/0.4.1 (external)";
+
+  // 本地 modelId → 上游 model id 的映射 (网关对外保持 kimi-k2.6 这种易记名)
+  private static readonly MODEL_ALIAS: Record<string, string> = {
+    "kimi-k2.6": "kimi-for-coding",
+  };
+
   private chatViaOpenApi(options: ChatOptions, apiKey: string): ReadableStream<Uint8Array> {
     const base = this.openApiBase;
+    const upstreamModel = KimiProvider.MODEL_ALIAS[options.model] || options.model;
+    const ua = this.CODING_UA;
     return this.createSSEStream(async function* (): AsyncGenerator<SSEChunk> {
       const upstream = await fetch(`${base}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "User-Agent": ua,
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: options.model,
+          model: upstreamModel,
           messages: options.messages,
           stream: true,
           ...(options.temperature != null ? { temperature: options.temperature } : {}),
@@ -236,7 +248,10 @@ export class KimiProvider extends BaseProvider {
     if (apiKey) {
       try {
         const res = await fetch(`${this.openApiBase}/models`, {
-          headers: { "Authorization": `Bearer ${apiKey}` },
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "User-Agent": this.CODING_UA,
+          },
         });
         return res.ok;
       } catch {
