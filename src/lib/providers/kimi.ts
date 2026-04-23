@@ -161,9 +161,12 @@ export class KimiProvider extends BaseProvider {
     return raw.replace(/\/+$/, "");
   }
 
-  // Kimi For Coding 服务器会校验 User-Agent, 必须是公开认可的 coding agent
-  // 这里伪装成 claude-cli, 其他可选: "kimi-cli", "roo-cli", "kilo"
-  private readonly CODING_UA = "claude-cli/0.4.1 (external)";
+  // Kimi For Coding 服务器会校验 User-Agent, 必须匹配公开 coding agent 白名单
+  // (Claude Code / Kimi CLI / Roo Code / Kilo Code 等). 通过 KIMI_UA 环境变量
+  // 覆盖, 默认用 claude-cli 的 UA. 换成其他白名单内的 UA 也可以, 但不能完全
+  // 不带这个特征(否则 upstream 返回 access_terminated_error 403).
+  private readonly CODING_UA =
+    process.env.KIMI_UA || "claude-cli/0.4.1 (external)";
 
   // 本地 modelId → 上游 model id 的映射 (网关对外保持 kimi-k2.6 这种易记名)
   private static readonly MODEL_ALIAS: Record<string, string> = {
