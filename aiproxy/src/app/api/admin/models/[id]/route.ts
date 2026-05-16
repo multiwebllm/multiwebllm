@@ -25,7 +25,9 @@ export async function PUT(
     upstreamModel: string;
     supportsVision: boolean;
     supportsImageGen: boolean;
-    maxTokens: number;
+    modelKind: string;
+    maxTokens: number | null;
+    contextWindow: number | null;
     status: "active" | "inactive" | "error";
   }>;
 

@@ -48,7 +48,9 @@ export const models = pgTable("models", {
   upstreamModel: varchar("upstream_model", { length: 100 }),
   supportsVision: boolean("supports_vision").notNull().default(false),
   supportsImageGen: boolean("supports_image_gen").notNull().default(false),
-  maxTokens: integer("max_tokens").default(4096),
+  modelKind: varchar("model_kind", { length: 20 }).notNull().default("chat"),
+  maxTokens: integer("max_tokens"),
+  contextWindow: integer("context_window"),
   status: providerStatusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

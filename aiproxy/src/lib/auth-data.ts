@@ -4,12 +4,19 @@ import { stampAuthRecord } from "./auth-meta";
  * 解析/压缩 Cookie 导入（浏览器扩展 JSON、Cookie 字符串等）
  */
 
+export interface CustomEndpoints {
+  chat?: string;
+  models?: string;
+}
+
 export interface NormalizedAuthData {
   cookies: Record<string, string> | string;
   token?: string;
   accessToken?: string;
+  apiKey?: string;
   snlm0e?: string;
   orgId?: string;
+  endpoints?: CustomEndpoints;
 }
 
 function domainMatchesHost(cookieDomain: string, host: string): boolean {
@@ -62,6 +69,14 @@ function pickExtras(obj: Record<string, unknown>): Partial<NormalizedAuthData> {
   }
   if (typeof obj.snlm0e === "string" && obj.snlm0e) extra.snlm0e = obj.snlm0e;
   if (typeof obj.orgId === "string" && obj.orgId) extra.orgId = obj.orgId;
+  if (typeof obj.apiKey === "string" && obj.apiKey) extra.apiKey = obj.apiKey;
+  if (obj.endpoints && typeof obj.endpoints === "object" && !Array.isArray(obj.endpoints)) {
+    const ep = obj.endpoints as Record<string, unknown>;
+    extra.endpoints = {
+      ...(typeof ep.chat === "string" ? { chat: ep.chat } : {}),
+      ...(typeof ep.models === "string" ? { models: ep.models } : {}),
+    };
+  }
   return extra;
 }
 
@@ -87,29 +102,40 @@ export function normalizeAuthInput(
   if (parsed && typeof parsed === "object") {
     const obj = parsed as Record<string, unknown>;
 
+    const extras = pickExtras(obj);
+
     if (Array.isArray(obj.cookies)) {
-      return { cookies: cookieArrayToMap(obj.cookies, baseUrl), ...pickExtras(obj) };
+      return { cookies: cookieArrayToMap(obj.cookies, baseUrl), ...extras };
     }
 
     if (obj.cookies && typeof obj.cookies === "object" && !Array.isArray(obj.cookies)) {
       return {
         cookies: obj.cookies as Record<string, string>,
-        ...pickExtras(obj),
+        ...extras,
       };
     }
 
     if (typeof obj.cookies === "string") {
-      return { cookies: obj.cookies, ...pickExtras(obj) };
+      return { cookies: obj.cookies, ...extras };
     }
 
     // 已是 { "SID": "...", ... } 形式
     const allStringValues = Object.values(obj).every((v) => typeof v === "string");
-    if (allStringValues && !obj.token && !obj.accessToken) {
+    if (
+      allStringValues &&
+      !obj.token &&
+      !obj.accessToken &&
+      !obj.apiKey &&
+      !obj.endpoints
+    ) {
       return { cookies: obj as Record<string, string> };
     }
 
-    const extras = pickExtras(obj);
-    if (extras.token || extras.accessToken) {
+    if (extras.token || extras.accessToken || extras.apiKey) {
+      return { cookies: {}, ...extras };
+    }
+
+    if (extras.endpoints) {
       return { cookies: {}, ...extras };
     }
   }

@@ -35,13 +35,10 @@ const modelList = [
   { id: "gemini-pro", name: "Gemini Pro", provider: "google" },
   { id: "gemini-ultra", name: "Gemini Ultra", provider: "google" },
   { id: "grok-1", name: "Grok-1", provider: "xai" },
-  { id: "deepseek-chat", name: "DeepSeek Chat", provider: "deepseek" },
   { id: "kimi-chat", name: "Kimi Chat", provider: "moonshot" },
-  { id: "abab6", name: "abab6", provider: "minimax" },
-  { id: "doubao-lite", name: "Doubao Lite", provider: "doubao" },
-  { id: "doubao-pro", name: "Doubao Pro", provider: "doubao" },
 ];
 
+/** 仅用于演示/开发：向 usage_logs 写入随机数据，生产环境请勿调用 */
 export async function POST(request: NextRequest) {
   if (!(await validateAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

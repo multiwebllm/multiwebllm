@@ -1,3 +1,5 @@
+import type { ModelKind } from "@/lib/models/model-kind";
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string | ContentPart[];
@@ -37,10 +39,14 @@ export interface ProviderModel {
   /** 官网/chat 实际使用的模型标识；缺省时与 id 相同 */
   upstreamModel?: string;
   description?: string;
+  /** 聊天 / 图片 / 视频 / 音频 / 代码 */
+  modelKind?: ModelKind;
   supportsVision?: boolean;
   supportsImageGen?: boolean;
-  maxTokens?: number;
-  contextWindow?: number;
+  /** 默认单次最大输出 token（聊天/代码） */
+  maxTokens?: number | null;
+  /** 上下文窗口大小（展示与落库） */
+  contextWindow?: number | null;
 }
 
 export interface ProviderConfig {

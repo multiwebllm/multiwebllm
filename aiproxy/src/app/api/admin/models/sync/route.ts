@@ -6,7 +6,8 @@ import { eq, and, notInArray } from "drizzle-orm";
 import { getProvider } from "@/lib/providers";
 import type { ProviderModel } from "@/lib/providers/base";
 import { isCatalogOnlyModels } from "@/lib/models/normalize";
-import { isWebChatProvider } from "@/lib/models/catalog";
+import { isSyncableProvider } from "@/lib/models/catalog";
+import { effectiveModelKind } from "@/lib/models/model-kind";
 import { deleteUnrelatedModels } from "@/lib/models/cleanup";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       .select()
       .from(providers)
       .where(eq(providers.status, "active"));
-    providersToSync = active.filter((p) => isWebChatProvider(p.slug));
+    providersToSync = active.filter((p) => isSyncableProvider(p.slug));
   }
 
   if (providersToSync.length === 0) {
@@ -88,10 +89,9 @@ export async function POST(request: NextRequest) {
       modelCount: 0,
     };
 
-    if (!isWebChatProvider(provider.slug)) {
+    if (!isSyncableProvider(provider.slug)) {
       result.skipped = 1;
-      result.skippedReason =
-        "该服务商为开放平台 API，不支持网页聊天模型同步（仅支持 ChatGPT / Claude / Gemini / Grok / Kimi）";
+      result.skippedReason = "该服务商不支持模型同步";
       result.success = true;
       results.push(result);
       continue;
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
       const fetchedModels = await providerInstance.fetchModels();
       result.modelCount = fetchedModels.length;
-      // fetchModels 内已按「最新 2 个主版本档」裁剪
+      // fetchModels：内置目录（2026 全量）+ 官网非旧版模型合并
       result.usedCatalog = isCatalogOnlyModels(fetchedModels);
 
       if (!fetchedModels || fetchedModels.length === 0) {
@@ -138,9 +138,11 @@ export async function POST(request: NextRequest) {
             .set({
               name: model.name,
               upstreamModel: upstream,
+              modelKind: effectiveModelKind(model),
               supportsVision: model.supportsVision ?? false,
               supportsImageGen: model.supportsImageGen ?? false,
-              maxTokens: model.maxTokens ?? 4096,
+              maxTokens: model.maxTokens ?? null,
+              contextWindow: model.contextWindow ?? null,
               status: "active",
             })
             .where(eq(models.id, existingId));
@@ -151,9 +153,11 @@ export async function POST(request: NextRequest) {
             name: model.name,
             modelId: model.id,
             upstreamModel: upstream,
+            modelKind: effectiveModelKind(model),
             supportsVision: model.supportsVision ?? false,
             supportsImageGen: model.supportsImageGen ?? false,
-            maxTokens: model.maxTokens ?? 4096,
+            maxTokens: model.maxTokens ?? null,
+            contextWindow: model.contextWindow ?? null,
             status: "active",
           });
           result.added++;

@@ -65,9 +65,11 @@ async function seed() {
         name: m.name,
         modelId: m.modelId,
         upstreamModel: m.upstreamModel,
-        maxTokens: m.maxTokens,
+        maxTokens: m.maxTokens ?? null,
+        contextWindow: m.contextWindow ?? null,
         supportsVision: m.supportsVision ?? false,
         supportsImageGen: m.supportsImageGen ?? false,
+        modelKind: m.modelKind ?? (m.supportsImageGen ? "image" : "chat"),
       })
       .onConflictDoNothing({ target: models.modelId });
   }

@@ -109,22 +109,6 @@ export async function fetchClaudeModels(
   return finalizeProviderModels("claude", official);
 }
 
-export async function fetchDeepSeekModels(
-  config: ProviderConfig,
-  baseUrl: string
-): Promise<ProviderModel[]> {
-  const headers = buildHeaders(config, { Accept: "application/json" });
-  const official = await tryUrls(
-    "deepseek",
-    [
-      `${baseUrl}/api/v0/models`,
-      `${baseUrl}/api/v0/model_configs`,
-    ],
-    headers
-  );
-  return finalizeProviderModels("deepseek", official);
-}
-
 export async function fetchKimiModels(
   config: ProviderConfig,
   baseUrl: string
@@ -182,62 +166,3 @@ export async function fetchGeminiModels(
   return finalizeProviderModels("gemini", official);
 }
 
-export async function fetchMinimaxModels(
-  config: ProviderConfig,
-  baseUrl: string
-): Promise<ProviderModel[]> {
-  const headers = buildHeaders(config);
-  const official = await tryUrls(
-    "minimax",
-    [
-      `${baseUrl}/api/models`,
-      `${baseUrl}/api/chat/models`,
-      `${baseUrl}/v1/api/models/list`,
-    ],
-    headers
-  );
-
-  if (official.length === 0) {
-    const userData = await fetchJsonWithTimeout(`${baseUrl}/api/user/info`, {
-      headers,
-    });
-    if (userData) {
-      const parsed = parseOfficialList("minimax", userData);
-      if (parsed.length > 0) {
-        return finalizeProviderModels("minimax", parsed);
-      }
-    }
-  }
-
-  return finalizeProviderModels("minimax", official);
-}
-
-export async function fetchDoubaoModels(
-  config: ProviderConfig,
-  baseUrl: string
-): Promise<ProviderModel[]> {
-  const headers = buildHeaders(config);
-  const official = await tryUrls(
-    "doubao",
-    [
-      `${baseUrl}/alice/api/models`,
-      `${baseUrl}/alice/api/model/list`,
-      `${baseUrl}/alice/api/bots/models`,
-    ],
-    headers
-  );
-
-  if (official.length === 0) {
-    const userData = await fetchJsonWithTimeout(`${baseUrl}/alice/api/user/info`, {
-      headers,
-    });
-    if (userData) {
-      const parsed = parseOfficialList("doubao", userData);
-      if (parsed.length > 0) {
-        return finalizeProviderModels("doubao", parsed);
-      }
-    }
-  }
-
-  return finalizeProviderModels("doubao", official);
-}

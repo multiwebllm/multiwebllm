@@ -1,11 +1,18 @@
 import type { ProviderModel } from "@/lib/providers/base";
 import {
   findCatalogEntry,
-  getCatalogForProvider,
+  getCurrentYearCatalogForProvider,
+  isCatalogModelId,
   isWebChatProvider,
   type CatalogModel,
 } from "./catalog";
 import { dropLegacyWebChatModels } from "./legacy-models";
+import {
+  capabilitiesForKind,
+  inferModelKind,
+  withKindCapabilities,
+} from "./model-kind";
+import { resolveModelLimits } from "./limits";
 import { limitToLatestVersionTiers } from "./version-rank";
 
 export function extractModelList(data: unknown): Record<string, unknown>[] {
@@ -120,24 +127,32 @@ export function extractDisplayName(
 }
 
 function catalogToProviderModel(entry: CatalogModel): ProviderModel {
-  return {
+  const kind = entry.modelKind ?? (entry.supportsImageGen ? "image" : "chat");
+  const caps = capabilitiesForKind(kind);
+  const limits = resolveModelLimits(kind, entry);
+  return withKindCapabilities({
     id: entry.modelId,
     name: entry.name,
     upstreamModel: entry.upstreamModel,
-    supportsVision: entry.supportsVision ?? false,
-    supportsImageGen: entry.supportsImageGen ?? false,
-    maxTokens: entry.maxTokens ?? 4096,
+    modelKind: kind,
+    supportsVision: entry.supportsVision ?? caps.supportsVision,
+    supportsImageGen: entry.supportsImageGen ?? caps.supportsImageGen,
+    maxTokens: limits.maxTokens,
+    contextWindow: limits.contextWindow,
     description: `${entry.name}（目录）`,
-  };
+  });
 }
 
-/** 官网 API 无结果时使用本地目录 */
+/** 官网 API 无结果时使用本地目录（当年） */
 export function catalogAsProviderModels(providerSlug: string): ProviderModel[] {
-  return getCatalogForProvider(providerSlug).map(catalogToProviderModel);
+  return getCurrentYearCatalogForProvider(providerSlug).map(
+    catalogToProviderModel
+  );
 }
 
 /**
- * 官网列表 + 内置目录合并：官网没有的较新模型仍会通过目录补充进来。
+ * 官网列表 + 内置目录合并。
+ * 内置网页服务商：保留完整当年目录 + 官网返回的非旧版模型（不再裁成仅 1 个聊天模型）。
  */
 export function finalizeProviderModels(
   providerSlug: string,
@@ -150,30 +165,24 @@ export function finalizeProviderModels(
   }
 
   const catalog = catalogAsProviderModels(providerSlug);
-  if (stripped.length === 0) {
-    return limitToLatestVersionTiers(catalog);
-  }
-
-  const seenId = new Set(stripped.map((m) => m.id.toLowerCase()));
+  const seenId = new Set(catalog.map((m) => m.id.toLowerCase()));
   const seenUpstream = new Set(
-    stripped.map((m) => (m.upstreamModel ?? m.id).toLowerCase())
+    catalog.map((m) => (m.upstreamModel ?? m.id).toLowerCase())
   );
 
-  for (const entry of getCatalogForProvider(providerSlug)) {
-    const up = (entry.upstreamModel ?? entry.modelId).toLowerCase();
-    if (seenId.has(entry.modelId.toLowerCase()) || seenUpstream.has(up)) {
-      continue;
-    }
-    const merged = catalogToProviderModel(entry);
-    stripped.push({
-      ...merged,
-      description: `${entry.name}（目录补充，需账号支持）`,
-    });
+  const extras: ProviderModel[] = [];
+
+  for (const m of stripped) {
+    const id = m.id.toLowerCase();
+    const up = (m.upstreamModel ?? m.id).toLowerCase();
+    if (seenId.has(id) || seenUpstream.has(up)) continue;
+    if (isCatalogModelId(providerSlug, m)) continue;
+    extras.push(m);
+    seenId.add(id);
+    seenUpstream.add(up);
   }
 
-  return limitToLatestVersionTiers(
-    dedupeProviderModels(dropLegacyWebChatModels(providerSlug, stripped))
-  );
+  return dedupeProviderModels([...catalog, ...extras]);
 }
 
 export function isCatalogOnlyModels(models: ProviderModel[]): boolean {
@@ -208,40 +217,51 @@ export function normalizeOfficialModel(
     ? tags.join(" ").toLowerCase()
     : String(tags ?? "").toLowerCase();
 
+  const modelKind = inferModelKind(officialId, tagStr, catalog?.modelKind);
+  const caps = capabilitiesForKind(modelKind);
+
   const supportsVision =
     catalog?.supportsVision ??
-    (tagStr.includes("vision") ||
-      tagStr.includes("image") ||
-      Boolean(item.supports_vision ?? item.supportsVision ?? item.vision));
+    (modelKind === "chat" &&
+      (tagStr.includes("vision") ||
+        Boolean(item.supports_vision ?? item.supportsVision ?? item.vision)));
 
   const supportsImageGen =
     catalog?.supportsImageGen ??
-    (tagStr.includes("dall") ||
+    (modelKind === "image" ||
+      tagStr.includes("dall") ||
       Boolean(item.supports_image_gen ?? item.supportsImageGen));
 
-  const maxTokens =
-    (typeof item.max_tokens === "number" && item.max_tokens) ||
-    (typeof item.maxTokens === "number" && item.maxTokens) ||
-    catalog?.maxTokens ||
-    4096;
-
-  const modelId = catalog?.modelId ?? slugToModelId(officialId);
-
-  return {
-    id: modelId,
-    name,
-    upstreamModel: officialId,
-    description:
-      (typeof item.description === "string" && item.description) ||
+  const officialLimits = {
+    maxTokens:
+      (typeof item.max_output_tokens === "number" && item.max_output_tokens) ||
+      (typeof item.max_tokens === "number" && item.max_tokens) ||
+      (typeof item.maxTokens === "number" && item.maxTokens) ||
       undefined,
-    supportsVision,
-    supportsImageGen,
-    maxTokens,
     contextWindow:
       (typeof item.context_window === "number" && item.context_window) ||
       (typeof item.contextWindow === "number" && item.contextWindow) ||
+      (typeof item.context_length === "number" && item.context_length) ||
       undefined,
   };
+
+  const limits = resolveModelLimits(modelKind, catalog, officialLimits);
+
+  const modelId = catalog?.modelId ?? slugToModelId(officialId);
+
+  return withKindCapabilities({
+    id: modelId,
+    name,
+    upstreamModel: officialId,
+    modelKind,
+    description:
+      (typeof item.description === "string" && item.description) ||
+      undefined,
+    supportsVision: supportsVision ?? caps.supportsVision,
+    supportsImageGen: supportsImageGen ?? caps.supportsImageGen,
+    maxTokens: limits.maxTokens,
+    contextWindow: limits.contextWindow,
+  });
 }
 
 function slugToModelId(officialId: string): string {

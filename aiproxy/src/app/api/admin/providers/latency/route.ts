@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { providers } from "@/lib/db/schema";
 import { validateAdmin } from "@/lib/auth";
-import { isWebChatProvider } from "@/lib/models/catalog";
+import { isSyncableProvider } from "@/lib/models/catalog";
 import { measureProvidersLatency } from "@/lib/provider-latency";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
     })
     .from(providers);
 
-  const targets = all.filter((p) => isWebChatProvider(p.slug));
+  const targets = all.filter(
+    (p) => isSyncableProvider(p.slug) && Boolean(p.baseUrl?.trim())
+  );
   const measured = await measureProvidersLatency(targets);
 
   return NextResponse.json({

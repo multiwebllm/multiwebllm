@@ -3,6 +3,11 @@ import { db } from "@/lib/db";
 import { providers } from "@/lib/db/schema";
 import { validateAdmin } from "@/lib/auth";
 import { normalizeAuthInput, authDataToRecord } from "@/lib/auth-data";
+import {
+  isRemovedProvider,
+  isWebChatProvider,
+  validateCustomProviderSlug,
+} from "@/lib/models/catalog";
 
 export async function GET(request: NextRequest) {
   if (!(await validateAdmin(request))) {
@@ -49,6 +54,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const slug = body.slug.trim().toLowerCase();
+  if (isRemovedProvider(slug)) {
+    return NextResponse.json(
+      { error: "该服务商已下线，请使用「自定义服务商」添加其它平台" },
+      { status: 400 }
+    );
+  }
+  if (!isWebChatProvider(slug)) {
+    const slugError = validateCustomProviderSlug(slug);
+    if (slugError) {
+      return NextResponse.json({ error: slugError }, { status: 400 });
+    }
+  }
+
   const authPayload =
     typeof body.authData === "string"
       ? authDataToRecord(normalizeAuthInput(body.authData, body.baseUrl))
@@ -63,7 +82,7 @@ export async function POST(request: NextRequest) {
       .insert(providers)
       .values({
         name: body.name,
-        slug: body.slug,
+        slug,
         baseUrl: body.baseUrl,
         authType: body.authType ?? "cookie",
         authData: authPayload,

@@ -25,7 +25,11 @@ MultiWebLLM 把「浏览器里已登录的 AI 网页会话」搬到服务器上�
 
 `chatgpt` · `claude` · `gemini` · `grok` · `kimi`
 
-模型同步、侧栏延迟探测、内置模型目录均围绕以上五家。其它 slug（如 `deepseek`）在 `src/lib/providers/` 中仍有代码，但不属于默认网页聊天同步范围。
+模型同步、侧栏延迟探测、内置模型目录均围绕以上五家。
+
+### 自定义服务商
+
+在管理后台选择 **「自定义服务商」**，填写基础地址、认证信息（Cookie / Token / API Key）及 OpenAI 兼容的聊天、模型列表路径（默认 `/v1/chat/completions`、`/v1/models`）。自定义 slug 由你指定，网关通过 `CustomProvider` 转发请求。
 
 ## 系统工作模式
 

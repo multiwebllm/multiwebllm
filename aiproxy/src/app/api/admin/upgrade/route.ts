@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 // 查询升级状态
 export async function GET() {
   return NextResponse.json({
-    currentVersion: "0.0.1",
+    currentVersion: "0.0.2",
     name: "multiwebllm",
   });
 }

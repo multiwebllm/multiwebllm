@@ -53,7 +53,13 @@ import {
   serializeAuthData,
   describeAuthData,
   formatAuthDataForEdit,
+  type CustomEndpoints,
 } from "@/lib/auth-data";
+import {
+  isCustomProvider,
+  isWebChatProvider,
+  validateCustomProviderSlug,
+} from "@/lib/models/catalog";
 import {
   fetchCookieJsonForUrl,
   discoverCookieBridge,
@@ -72,7 +78,13 @@ interface Provider {
   lastCheckedAt: string | null;
 }
 
-type ProviderForm = Omit<Provider, "id" | "lastCheckedAt">;
+type ProviderForm = Omit<Provider, "id" | "lastCheckedAt"> & {
+  chatEndpoint: string;
+  modelsEndpoint: string;
+};
+
+const DEFAULT_CHAT_ENDPOINT = "/v1/chat/completions";
+const DEFAULT_MODELS_ENDPOINT = "/v1/models";
 
 const emptyForm: ProviderForm = {
   name: "",
@@ -81,9 +93,39 @@ const emptyForm: ProviderForm = {
   authType: "cookie",
   authData: "",
   status: "active",
+  chatEndpoint: DEFAULT_CHAT_ENDPOINT,
+  modelsEndpoint: DEFAULT_MODELS_ENDPOINT,
 };
 
-// 预设服务商模板（仅网页订阅聊天；DeepSeek / Minimax / 豆包等为开放平台 API）
+function isCustomFormState(
+  slug: string,
+  template: string
+): boolean {
+  return template === "custom" || (!!slug && isCustomProvider(slug));
+}
+
+function endpointsFromAuthRaw(authData: string): CustomEndpoints {
+  if (!authData.trim()) return {};
+  try {
+    const parsed = JSON.parse(authData) as { endpoints?: CustomEndpoints };
+    return parsed.endpoints ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function buildAuthPayload(form: ProviderForm, template: string): string {
+  const normalized = normalizeAuthInput(form.authData, form.baseUrl);
+  if (isCustomFormState(form.slug, template)) {
+    normalized.endpoints = {
+      chat: form.chatEndpoint.trim() || DEFAULT_CHAT_ENDPOINT,
+      models: form.modelsEndpoint.trim() || DEFAULT_MODELS_ENDPOINT,
+    };
+  }
+  return serializeAuthData(normalized);
+}
+
+// 预设服务商模板（内置网页订阅聊天）
 const providerTemplates: Record<string, Partial<ProviderForm>> = {
   chatgpt: {
     name: "ChatGPT",
@@ -118,8 +160,8 @@ const providerTemplates: Record<string, Partial<ProviderForm>> = {
   custom: {
     name: "",
     slug: "",
-    baseUrl: "",
-    authType: "api_key",
+    baseUrl: "https://",
+    authType: "cookie",
   },
 };
 
@@ -214,6 +256,8 @@ export default function ProvidersPage() {
     } catch {
       // ignore
     }
+    const endpoints = endpointsFromAuthRaw(authData);
+    setSelectedTemplate(isCustomProvider(provider.slug) ? "custom" : "");
     setForm({
       name: provider.name,
       slug: provider.slug,
@@ -221,6 +265,8 @@ export default function ProvidersPage() {
       authType: provider.authType,
       authData,
       status: provider.status,
+      chatEndpoint: endpoints.chat || DEFAULT_CHAT_ENDPOINT,
+      modelsEndpoint: endpoints.models || DEFAULT_MODELS_ENDPOINT,
     });
     setDialogOpen(true);
   }
@@ -242,6 +288,8 @@ export default function ProvidersPage() {
         baseUrl: tpl.baseUrl || "",
         authType: tpl.authType || "cookie",
         authData: "",
+        chatEndpoint: DEFAULT_CHAT_ENDPOINT,
+        modelsEndpoint: DEFAULT_MODELS_ENDPOINT,
       }));
     }
   }
@@ -344,6 +392,15 @@ export default function ProvidersPage() {
   async function handleSave() {
     setSaving(true);
     setAuthError(null);
+    const slug = form.slug.trim().toLowerCase();
+    if (!isWebChatProvider(slug)) {
+      const slugError = validateCustomProviderSlug(slug);
+      if (slugError) {
+        setAuthError(slugError);
+        setSaving(false);
+        return;
+      }
+    }
     try {
       const url = editingId
         ? `/api/admin/providers/${editingId}`
@@ -354,10 +411,10 @@ export default function ProvidersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
-          slug: form.slug,
+          slug,
           baseUrl: form.baseUrl,
           authType: form.authType,
-          authData: form.authData,
+          authData: buildAuthPayload(form, selectedTemplate),
           status: form.status,
         }),
       });
@@ -535,7 +592,7 @@ export default function ProvidersPage() {
                     <SelectItem value="gemini">💎 Gemini (Google)</SelectItem>
                     <SelectItem value="grok">🤖 Grok</SelectItem>
                     <SelectItem value="kimi">🌙 Kimi</SelectItem>
-                    <SelectItem value="custom">✏️ 自定义（开放平台 API）</SelectItem>
+                    <SelectItem value="custom">✏️ 自定义服务商</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -568,6 +625,38 @@ export default function ProvidersPage() {
                 placeholder="https://kimi.moonshot.cn"
               />
             </div>
+            {isCustomFormState(form.slug, selectedTemplate) && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="chatEndpoint">聊天 API 路径</Label>
+                  <Input
+                    id="chatEndpoint"
+                    value={form.chatEndpoint}
+                    onChange={(e) =>
+                      setForm({ ...form, chatEndpoint: e.target.value })
+                    }
+                    placeholder={DEFAULT_CHAT_ENDPOINT}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    OpenAI 兼容：与基础地址拼接，默认 {DEFAULT_CHAT_ENDPOINT}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="modelsEndpoint">模型列表 API 路径</Label>
+                  <Input
+                    id="modelsEndpoint"
+                    value={form.modelsEndpoint}
+                    onChange={(e) =>
+                      setForm({ ...form, modelsEndpoint: e.target.value })
+                    }
+                    placeholder={DEFAULT_MODELS_ENDPOINT}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    用于「同步模型」与连接测试，默认 {DEFAULT_MODELS_ENDPOINT}
+                  </p>
+                </div>
+              </>
+            )}
             <div className="grid gap-2">
               <Label>认证方式</Label>
               <Select

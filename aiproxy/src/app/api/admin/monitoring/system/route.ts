@@ -373,7 +373,7 @@ export async function GET(request: NextRequest) {
     hostname: getHostname(),
     platform: getPlatform(),
     cpu: {
-      percent: cpu.percent || Math.round(Math.random() * 20 + 5),
+      percent: cpu.percent,
       cores: cpu.cores,
     },
     memory: {
@@ -382,7 +382,7 @@ export async function GET(request: NextRequest) {
       totalGB: memTotalGB,
     },
     disk: {
-      percent: disk.percent || 79,
+      percent: disk.percent,
       usedGB: disk.usedGB,
       totalGB: disk.totalGB,
     },

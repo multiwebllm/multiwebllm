@@ -41,11 +41,19 @@ import {
   Pencil,
   Trash2,
   Loader2,
-  Check,
-  X,
   RefreshCw,
 } from "lucide-react";
-import { isWebChatProvider } from "@/lib/models/catalog";
+import { isSyncableProvider } from "@/lib/models/catalog";
+import {
+  capabilitiesForKind,
+  MODEL_KIND_LABELS,
+  MODEL_KINDS,
+  type ModelKind,
+} from "@/lib/models/model-kind";
+import {
+  defaultLimitsForKind,
+  formatTokenLimit,
+} from "@/lib/models/limits";
 
 interface Provider {
   id: number;
@@ -62,7 +70,9 @@ interface Model {
   upstreamModel: string | null;
   supportsVision: boolean;
   supportsImageGen: boolean;
-  maxTokens: number;
+  modelKind: string;
+  maxTokens: number | null;
+  contextWindow: number | null;
   status: "active" | "inactive";
 }
 
@@ -73,7 +83,9 @@ interface ModelForm {
   upstreamModel: string;
   supportsVision: boolean;
   supportsImageGen: boolean;
-  maxTokens: number;
+  modelKind: ModelKind;
+  maxTokens: string;
+  contextWindow: string;
   status: "active" | "inactive";
 }
 
@@ -82,10 +94,20 @@ const emptyForm: ModelForm = {
   modelId: "",
   providerId: "",
   upstreamModel: "",
-  supportsVision: false,
+  supportsVision: true,
   supportsImageGen: false,
-  maxTokens: 4096,
+  modelKind: "chat",
+  maxTokens: "16384",
+  contextWindow: "128000",
   status: "active",
+};
+
+const KIND_BADGE_CLASS: Record<ModelKind, string> = {
+  chat: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  image: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  video: "bg-amber-500/15 text-amber-800 dark:text-amber-400",
+  audio: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  code: "bg-slate-500/15 text-slate-700 dark:text-slate-300",
 };
 
 export default function ModelsPage() {
@@ -110,8 +132,8 @@ export default function ModelsPage() {
     "active"
   );
 
-  const fetchModels = useCallback(async () => {
-    setLoading(true);
+  const fetchModels = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/admin/models?_=${Date.now()}`, {
         cache: "no-store",
@@ -131,7 +153,7 @@ export default function ModelsPage() {
     } catch {
       setFeedback({ success: false, message: "加载模型列表失败" });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -208,7 +230,19 @@ export default function ModelsPage() {
       upstreamModel: model.upstreamModel ?? "",
       supportsVision: model.supportsVision,
       supportsImageGen: model.supportsImageGen,
-      maxTokens: model.maxTokens,
+      modelKind: (MODEL_KINDS as readonly string[]).includes(model.modelKind)
+        ? (model.modelKind as ModelKind)
+        : model.supportsImageGen
+          ? "image"
+          : "chat",
+      maxTokens:
+        model.maxTokens != null && model.maxTokens > 0
+          ? String(model.maxTokens)
+          : "",
+      contextWindow:
+        model.contextWindow != null && model.contextWindow > 0
+          ? String(model.contextWindow)
+          : "",
       status: model.status,
     });
     setDialogOpen(true);
@@ -227,10 +261,17 @@ export default function ModelsPage() {
         ? `/api/admin/models/${editingId}`
         : "/api/admin/models";
       const method = editingId ? "PUT" : "POST";
+      const kind = form.modelKind;
+      const usesTokens = kind === "chat" || kind === "code";
       const payload = {
         ...form,
         providerId: Number(form.providerId),
-        maxTokens: Number(form.maxTokens) || 4096,
+        maxTokens: usesTokens
+          ? parseInt(form.maxTokens, 10) || null
+          : null,
+        contextWindow: usesTokens
+          ? parseInt(form.contextWindow, 10) || null
+          : null,
       };
       const res = await fetch(url, {
         method,
@@ -308,7 +349,7 @@ export default function ModelsPage() {
   const providerName = (id: number) =>
     providers.find((p) => p.id === id)?.name ?? String(id);
 
-  const webChatProviders = providers.filter((p) => isWebChatProvider(p.slug));
+  const syncableProviders = providers.filter((p) => isSyncableProvider(p.slug));
 
   async function handleSync() {
     setSyncing(true);
@@ -358,10 +399,10 @@ export default function ModelsPage() {
           success: true,
           message:
             changed > 0
-              ? `同步完成：新增 ${data.summary.totalAdded}，更新 ${data.summary.totalUpdated}${removedHint}${cleanupHint}；仅保留各服务商最新一代模型${catalogHint}`
-              : `同步完成（仅最新一代模型）${cleanupHint}${removedHint}${catalogHint}`,
+              ? `同步完成：新增 ${data.summary.totalAdded}，更新 ${data.summary.totalUpdated}${removedHint}${cleanupHint}；已合并 2026 目录与官网列表${catalogHint}`
+              : `同步完成（2026 目录已写入）${cleanupHint}${removedHint}${catalogHint}`,
         });
-      await fetchModels();
+      await fetchModels(true);
     } catch {
       setFeedback({ success: false, message: "网络错误，请稍后重试" });
     } finally {
@@ -413,8 +454,11 @@ export default function ModelsPage() {
             onClick={handleSync}
             disabled={syncing || cleaning}
           >
-            {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            <RefreshCw className="mr-2 h-4 w-4" />
+            {syncing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
             同步模型
           </Button>
           <Button onClick={openAdd}>
@@ -469,9 +513,9 @@ export default function ModelsPage() {
                   <TableHead>模型 ID</TableHead>
                   <TableHead>上游模型</TableHead>
                   <TableHead>服务商</TableHead>
-                  <TableHead>视觉</TableHead>
-                  <TableHead>图片生成</TableHead>
-                  <TableHead>最大 Token</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>上下文</TableHead>
+                  <TableHead>默认输出</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -501,20 +545,14 @@ export default function ModelsPage() {
                       </TableCell>
                       <TableCell>{m.providerName ?? providerName(m.providerId)}</TableCell>
                       <TableCell>
-                        {m.supportsVision ? (
-                          <Check className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <X className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        <KindBadge kind={resolveModelKind(m)} />
                       </TableCell>
-                      <TableCell>
-                        {m.supportsImageGen ? (
-                          <Check className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <X className="h-4 w-4 text-muted-foreground" />
-                        )}
+                      <TableCell className="tabular-nums text-sm">
+                        {formatTokenLimit(m.contextWindow)}
                       </TableCell>
-                      <TableCell>{m.maxTokens.toLocaleString()}</TableCell>
+                      <TableCell className="tabular-nums text-sm">
+                        {formatTokenLimit(m.maxTokens)}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           className={
@@ -585,7 +623,7 @@ export default function ModelsPage() {
                   <SelectValue placeholder="选择服务商" />
                 </SelectTrigger>
                 <SelectContent>
-                  {webChatProviders.map((p) => (
+                  {syncableProviders.map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       {p.name}
                     </SelectItem>
@@ -604,7 +642,41 @@ export default function ModelsPage() {
                 placeholder="gpt-4o-2024-08-06"
               />
             </div>
-            <div className="flex items-center gap-6">
+            <div className="grid gap-2">
+              <Label>模型类型</Label>
+              <Select
+                value={form.modelKind}
+                onValueChange={(val: string | null) => {
+                  const kind = (val || "chat") as ModelKind;
+                  const caps = capabilitiesForKind(kind);
+                  const limits = defaultLimitsForKind(kind);
+                  setForm({
+                    ...form,
+                    modelKind: kind,
+                    supportsVision: caps.supportsVision,
+                    supportsImageGen: caps.supportsImageGen,
+                    maxTokens:
+                      limits.maxTokens != null ? String(limits.maxTokens) : "",
+                    contextWindow:
+                      limits.contextWindow != null
+                        ? String(limits.contextWindow)
+                        : "",
+                  });
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODEL_KINDS.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {MODEL_KIND_LABELS[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.modelKind === "chat" && (
               <div className="flex items-center gap-2">
                 <Switch
                   checked={form.supportsVision}
@@ -612,29 +684,42 @@ export default function ModelsPage() {
                     setForm({ ...form, supportsVision: !!checked })
                   }
                 />
-                <Label>视觉</Label>
+                <Label>支持视觉（图片输入）</Label>
               </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={form.supportsImageGen}
-                  onCheckedChange={(checked) =>
-                    setForm({ ...form, supportsImageGen: !!checked })
-                  }
-                />
-                <Label>图片生成</Label>
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="m-max_tokens">最大 Token</Label>
-              <Input
-                id="m-max_tokens"
-                type="number"
-                value={form.maxTokens}
-                onChange={(e) =>
-                  setForm({ ...form, maxTokens: parseInt(e.target.value) || 0 })
-                }
-              />
-            </div>
+            )}
+            {(form.modelKind === "chat" || form.modelKind === "code") && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="m-context">上下文窗口（Token）</Label>
+                  <Input
+                    id="m-context"
+                    type="number"
+                    min={0}
+                    value={form.contextWindow}
+                    onChange={(e) =>
+                      setForm({ ...form, contextWindow: e.target.value })
+                    }
+                    placeholder="128000"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="m-max_tokens">默认最大输出（Token）</Label>
+                  <Input
+                    id="m-max_tokens"
+                    type="number"
+                    min={0}
+                    value={form.maxTokens}
+                    onChange={(e) =>
+                      setForm({ ...form, maxTokens: e.target.value })
+                    }
+                    placeholder="16384"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    客户端未传 max_tokens 时使用；网页 Cookie 上游可能忽略该值。
+                  </p>
+                </div>
+              </>
+            )}
             <div className="grid gap-2">
               <Label>状态</Label>
               <Select
@@ -685,5 +770,19 @@ export default function ModelsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function resolveModelKind(m: Model): ModelKind {
+  if ((MODEL_KINDS as readonly string[]).includes(m.modelKind)) {
+    return m.modelKind as ModelKind;
+  }
+  if (m.supportsImageGen) return "image";
+  return "chat";
+}
+
+function KindBadge({ kind }: { kind: ModelKind }) {
+  return (
+    <Badge className={KIND_BADGE_CLASS[kind]}>{MODEL_KIND_LABELS[kind]}</Badge>
   );
 }

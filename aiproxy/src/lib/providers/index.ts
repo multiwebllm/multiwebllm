@@ -1,12 +1,11 @@
 import { BaseProvider, ProviderConfig } from "./base";
 import { ChatGPTProvider } from "./chatgpt";
 import { KimiProvider } from "./kimi";
-import { MinimaxProvider } from "./minimax";
 import { GrokProvider } from "./grok";
 import { GeminiProvider } from "./gemini";
-import { DeepSeekProvider } from "./deepseek";
 import { ClaudeProvider } from "./claude";
-import { DouBaoProvider } from "./doubao";
+import { CustomProvider, customProviderConfig } from "./custom";
+import { isWebChatProvider } from "@/lib/models/catalog";
 
 const providerMap: Record<
   string,
@@ -14,12 +13,9 @@ const providerMap: Record<
 > = {
   chatgpt: ChatGPTProvider,
   kimi: KimiProvider,
-  minimax: MinimaxProvider,
   grok: GrokProvider,
   gemini: GeminiProvider,
-  deepseek: DeepSeekProvider,
   claude: ClaudeProvider,
-  doubao: DouBaoProvider,
 };
 
 export function getProvider(
@@ -27,11 +23,15 @@ export function getProvider(
   config: ProviderConfig
 ): BaseProvider {
   const ProviderClass = providerMap[slug];
-  if (!ProviderClass) {
-    throw new Error(`Unknown provider: ${slug}`);
+  if (ProviderClass) {
+    return new ProviderClass(config);
   }
-  return new ProviderClass(config);
+  if (isWebChatProvider(slug)) {
+    throw new Error(`Unknown built-in provider: ${slug}`);
+  }
+  return new CustomProvider(customProviderConfig(slug, config));
 }
 
 export { BaseProvider } from "./base";
 export type { ProviderConfig, ChatOptions, SSEChunk, QuotaInfo } from "./base";
+export { CustomProvider } from "./custom";

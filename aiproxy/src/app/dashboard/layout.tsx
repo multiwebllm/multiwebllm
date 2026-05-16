@@ -3,42 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Unplug,
-  BrainCircuit,
-  KeySquare,
-  SlidersHorizontal,
   LogOut,
   Sparkles,
   Shield,
   ArrowUpCircle,
   X,
-  Monitor,
-  ScrollText,
   Activity,
   Loader2,
+  RotateCw,
 } from "lucide-react";
+import { dashboardNavItems } from "@/lib/dashboard/nav-guide";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useCallback, useEffect, useState } from "react";
 
-const CURRENT_VERSION = "0.0.1";
+const CURRENT_VERSION = "0.0.2";
 const VERSION_CHECK_URL = "https://api.multiwebllm.io/v1/version";
-
-const navItems = [
-  { href: "/dashboard", label: "控制台", icon: LayoutDashboard },
-  { href: "/dashboard/monitoring", label: "运维监控", icon: Monitor },
-  { href: "/dashboard/records", label: "使用记录", icon: ScrollText },
-  { href: "/dashboard/providers", label: "服务商管理", icon: Unplug },
-  { href: "/dashboard/models", label: "模型配置", icon: BrainCircuit },
-  { href: "/dashboard/keys", label: "API 密钥", icon: KeySquare },
-  { href: "/dashboard/settings", label: "系统设置", icon: SlidersHorizontal },
-];
 
 interface VersionInfo {
   latest: string;
@@ -48,7 +28,7 @@ interface VersionInfo {
   downloadUrl?: string;
 }
 
-interface ProviderLatencyRow {
+interface ProviderStatusRow {
   slug: string;
   name: string;
   baseUrl: string;
@@ -59,24 +39,15 @@ interface ProviderLatencyRow {
   error?: string;
 }
 
-function latencyDotClass(
-  status: string,
-  latencyMs: number | null,
-  reachable: boolean
-): string {
-  if (status !== "active") {
-    return "bg-gray-400 ring-gray-400/20";
+function providerFaviconDomain(baseUrl: string, slug: string): string {
+  try {
+    if (baseUrl?.trim()) {
+      return new URL(baseUrl).hostname;
+    }
+  } catch {
+    // ignore invalid URL
   }
-  if (!reachable || latencyMs === null) {
-    return "bg-red-500 ring-red-500/20";
-  }
-  if (latencyMs < 500) {
-    return "bg-emerald-500 ring-emerald-500/20";
-  }
-  if (latencyMs < 1500) {
-    return "bg-amber-500 ring-amber-500/20";
-  }
-  return "bg-orange-500 ring-orange-500/20";
+  return slug;
 }
 
 function formatLatencyLabel(
@@ -95,12 +66,42 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [providerStatuses, setProviderStatuses] = useState<ProviderLatencyRow[]>(
+  const [providerStatuses, setProviderStatuses] = useState<ProviderStatusRow[]>(
     []
   );
-  const [latencyLoading, setLatencyLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [latencyLoading, setLatencyLoading] = useState(false);
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [dismissedUpdate, setDismissedUpdate] = useState(false);
+
+  const loadProviderStatus = useCallback(async () => {
+    setStatusLoading(true);
+    try {
+      const res = await fetch("/api/admin/providers/status", {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data.providers)) return;
+      setProviderStatuses(
+        data.providers.map(
+          (p: ProviderStatusRow & { models?: unknown }) => ({
+            slug: p.slug,
+            name: p.name,
+            baseUrl: p.baseUrl,
+            status: p.status,
+            latencyMs: null,
+            reachable: false,
+          })
+        )
+      );
+    } catch {
+      // ignore
+    } finally {
+      setStatusLoading(false);
+    }
+  }, []);
 
   const loadProviderLatency = useCallback(async () => {
     setLatencyLoading(true);
@@ -111,9 +112,32 @@ export default function DashboardLayout({
       });
       if (!res.ok) return;
       const data = await res.json();
-      if (Array.isArray(data.providers)) {
-        setProviderStatuses(data.providers);
-      }
+      if (!Array.isArray(data.providers)) return;
+
+      type LatencyProbe = {
+        slug: string;
+        latencyMs: number | null;
+        reachable: boolean;
+        httpStatus?: number;
+        error?: string;
+      };
+      const latencyBySlug = new Map<string, LatencyProbe>(
+        (data.providers as LatencyProbe[]).map((p) => [p.slug, p])
+      );
+
+      setProviderStatuses((prev) =>
+        prev.map((row) => {
+          const probe = latencyBySlug.get(row.slug);
+          if (!probe) return row;
+          return {
+            ...row,
+            latencyMs: probe.latencyMs,
+            reachable: probe.reachable,
+            httpStatus: probe.httpStatus,
+            error: probe.error,
+          };
+        })
+      );
     } catch {
       // ignore
     } finally {
@@ -122,10 +146,13 @@ export default function DashboardLayout({
   }, []);
 
   useEffect(() => {
-    void loadProviderLatency();
+    void (async () => {
+      await loadProviderStatus();
+      await loadProviderLatency();
+    })();
     const timer = setInterval(() => void loadProviderLatency(), 60_000);
     return () => clearInterval(timer);
-  }, [loadProviderLatency]);
+  }, [loadProviderStatus, loadProviderLatency]);
 
   useEffect(() => {
     fetch(VERSION_CHECK_URL)
@@ -149,7 +176,6 @@ export default function DashboardLayout({
   }, []);
 
   return (
-    <TooltipProvider>
       <div className="flex h-screen bg-background">
         {/* Sidebar */}
         <aside className="flex w-64 flex-col border-r bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
@@ -205,7 +231,7 @@ export default function DashboardLayout({
             <p className="mb-2 px-3 text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
               导航
             </p>
-            {navItems.map((item) => {
+            {dashboardNavItems.map((item) => {
               const isActive =
                 pathname === item.href ||
                 (item.href !== "/dashboard" &&
@@ -214,69 +240,100 @@ export default function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
+                  title={`${item.label} — ${item.description}`}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-all duration-150",
+                    "flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-150",
                     isActive
                       ? "bg-blue-600 text-white"
                       : "text-muted-foreground hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950 dark:hover:text-blue-300"
                   )}
                 >
-                  <item.icon className={cn("h-[18px] w-[18px]", isActive ? "opacity-100" : "opacity-70")} />
-                  {item.label}
+                  <item.icon
+                    className={cn(
+                      "mt-0.5 h-[18px] w-[18px] shrink-0",
+                      isActive ? "opacity-100" : "opacity-70"
+                    )}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium leading-tight">
+                      {item.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-0.5 block text-[11px] font-normal leading-snug",
+                        isActive
+                          ? "text-blue-100"
+                          : "text-muted-foreground/80"
+                      )}
+                    >
+                      {item.description}
+                    </span>
+                  </span>
                 </Link>
               );
             })}
           </nav>
 
-          {/* Provider Status（异步检测官网延迟） */}
+          {/* 服务状态：先展示服务商，再异步测速 */}
           <div className="border-t p-3">
-            <div className="mb-2 flex items-center gap-2 px-3">
+            <div className="mb-2 flex items-center gap-1.5 px-3">
               <Activity className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
               <p className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                 服务状态
               </p>
-              {latencyLoading && (
-                <Loader2
-                  className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-600"
-                  aria-label="正在检测"
-                />
-              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-blue-600"
+                disabled={
+                  latencyLoading ||
+                  (statusLoading && providerStatuses.length === 0)
+                }
+                onClick={() => void loadProviderLatency()}
+                title="重新测速"
+              >
+                {latencyLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RotateCw className="h-3 w-3" />
+                )}
+                <span className="ml-1">重新测试</span>
+              </Button>
             </div>
-            <div
-              className={cn(
-                "space-y-0.5 transition-opacity",
-                latencyLoading && providerStatuses.length > 0 && "opacity-70"
-              )}
-            >
-              {latencyLoading && providerStatuses.length === 0 ? (
+            <div className="max-h-[min(40vh,280px)] space-y-2 overflow-y-auto">
+              {statusLoading && providerStatuses.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-5">
                   <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                   <p className="text-xs text-muted-foreground/70">
-                    正在检测官网延迟…
+                    正在加载…
                   </p>
                 </div>
               ) : providerStatuses.length > 0 ? (
-                providerStatuses.map((p) => (
-                  <Tooltip key={p.slug}>
-                    <TooltipTrigger className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-sm text-muted-foreground hover:bg-blue-50/50 dark:hover:bg-blue-950/50 transition-colors">
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        <span
-                          className={cn(
-                            "h-2 w-2 shrink-0 rounded-full ring-2",
-                            latencyLoading
-                              ? "bg-muted-foreground/30 ring-muted-foreground/10"
-                              : latencyDotClass(
-                                  p.status,
-                                  p.latencyMs,
-                                  p.reachable
-                                )
-                          )}
+                providerStatuses.map((p) => {
+                  const faviconDomain = providerFaviconDomain(
+                    p.baseUrl,
+                    p.slug
+                  );
+                  return (
+                    <div
+                      key={p.slug}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-sm text-muted-foreground"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <img
+                          src={`https://favicon.im/${faviconDomain}`}
+                          alt={`${faviconDomain} favicon`}
+                          loading="lazy"
+                          width={16}
+                          height={16}
+                          className="h-4 w-4 shrink-0 rounded-sm object-contain"
                         />
-                        <span className="truncate">{p.name}</span>
+                        <span className="truncate font-medium">{p.name}</span>
                       </span>
                       <span
                         className={cn(
-                          "flex h-4 min-w-[3rem] shrink-0 items-center justify-end tabular-nums text-xs font-medium",
+                          "flex h-4 min-w-[3rem] shrink-0 items-center justify-end tabular-nums text-xs",
                           !latencyLoading &&
                             p.status === "active" &&
                             p.reachable &&
@@ -297,24 +354,9 @@ export default function DashboardLayout({
                           )
                         )}
                       </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-xs">
-                      <p className="font-medium">{p.name}</p>
-                      <p className="text-xs text-muted-foreground break-all">
-                        {p.baseUrl}
-                      </p>
-                      <p className="mt-1 text-xs">
-                        {p.status !== "active"
-                          ? "服务商未启用"
-                          : p.reachable && p.latencyMs !== null
-                            ? `服务器 → 官网：${p.latencyMs} ms${
-                                p.httpStatus ? ` (HTTP ${p.httpStatus})` : ""
-                              }`
-                            : "无法连通或请求超时"}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                ))
+                    </div>
+                  );
+                })
               ) : (
                 <div className="flex items-center gap-2 px-3 py-2">
                   <Shield className="h-3.5 w-3.5 text-muted-foreground/50" />
@@ -343,6 +385,5 @@ export default function DashboardLayout({
           <div className="p-6">{children}</div>
         </main>
       </div>
-    </TooltipProvider>
   );
 }

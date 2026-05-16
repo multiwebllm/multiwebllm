@@ -1,13 +1,14 @@
 import { db } from "@/lib/db";
 import { apiKeys, models, providers } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { isWebChatProvider } from "./catalog";
+import { REMOVED_PROVIDER_SLUGS } from "./catalog";
 import { isLegacyWebChatModel } from "./legacy-models";
 
 export interface UnrelatedModelsCleanupResult {
   deleted: number;
   deletedModelIds: string[];
   providerSlugs: string[];
+  removedProviders: number;
   apiKeysUpdated: number;
   inactiveDeleted: number;
 }
@@ -93,68 +94,59 @@ export async function deleteInactiveModels(): Promise<{
   return { deleted: rows.length, deletedModelIds };
 }
 
-/** 删除非网页聊天服务商（DeepSeek / Minimax / 豆包等）下的全部模型 */
+/** 删除已下线的内置服务商（DeepSeek / Minimax / 豆包）及其模型 */
+export async function deleteRemovedProviders(): Promise<{
+  removedProviders: number;
+  deletedModelIds: string[];
+}> {
+  const removed = await db
+    .select({ id: providers.id })
+    .from(providers)
+    .where(inArray(providers.slug, [...REMOVED_PROVIDER_SLUGS] as string[]));
+
+  if (removed.length === 0) {
+    return { removedProviders: 0, deletedModelIds: [] };
+  }
+
+  const ids = removed.map((p) => p.id);
+  const modelRows = await db
+    .select({ modelId: models.modelId })
+    .from(models)
+    .where(inArray(models.providerId, ids));
+
+  const deletedModelIds = modelRows.map((r) => r.modelId);
+  await db.delete(providers).where(inArray(providers.id, ids));
+  await scrubApiKeysAllowedModels(deletedModelIds);
+
+  return { removedProviders: removed.length, deletedModelIds };
+}
+
+/** 清理旧版 Kimi、inactive 模型，并移除已下线服务商 */
 export async function deleteUnrelatedModels(): Promise<UnrelatedModelsCleanupResult> {
-  const allProviders = await db.select({
-    id: providers.id,
-    slug: providers.slug,
-  }).from(providers);
-
-  const unrelatedProviderIds = allProviders
-    .filter((p) => !isWebChatProvider(p.slug))
-    .map((p) => p.id);
-
-  const unrelatedSlugs = allProviders
-    .filter((p) => !isWebChatProvider(p.slug))
-    .map((p) => p.slug);
-
+  const removedCleanup = await deleteRemovedProviders();
   const legacyCleanup = await deleteLegacyWebChatModels();
   const inactiveCleanup = await deleteInactiveModels();
 
-  if (unrelatedProviderIds.length === 0) {
-    const allDeletedIds = [
-      ...legacyCleanup.deletedModelIds,
-      ...inactiveCleanup.deletedModelIds.filter(
-        (id) => !legacyCleanup.deletedModelIds.includes(id)
-      ),
-    ];
-    return {
-      deleted: legacyCleanup.deleted + inactiveCleanup.deleted,
-      deletedModelIds: allDeletedIds,
-      providerSlugs: [],
-      apiKeysUpdated: await scrubApiKeysAllowedModels(allDeletedIds),
-      inactiveDeleted: inactiveCleanup.deleted,
-    };
-  }
-
-  const rows = await db
-    .select({ id: models.id, modelId: models.modelId })
-    .from(models)
-    .where(inArray(models.providerId, unrelatedProviderIds));
-
-  const deletedModelIds = rows.map((r) => r.modelId);
-
-  if (rows.length > 0) {
-    await db
-      .delete(models)
-      .where(inArray(models.providerId, unrelatedProviderIds));
-  }
-
   const allDeletedIds = [
-    ...deletedModelIds,
+    ...removedCleanup.deletedModelIds,
     ...legacyCleanup.deletedModelIds,
     ...inactiveCleanup.deletedModelIds.filter(
       (id) =>
-        !deletedModelIds.includes(id) &&
+        !removedCleanup.deletedModelIds.includes(id) &&
         !legacyCleanup.deletedModelIds.includes(id)
     ),
   ];
+
   const apiKeysUpdated = await scrubApiKeysAllowedModels(allDeletedIds);
 
   return {
-    deleted: rows.length + legacyCleanup.deleted + inactiveCleanup.deleted,
+    deleted:
+      removedCleanup.deletedModelIds.length +
+      legacyCleanup.deleted +
+      inactiveCleanup.deleted,
     deletedModelIds: allDeletedIds,
-    providerSlugs: unrelatedSlugs,
+    providerSlugs: [...REMOVED_PROVIDER_SLUGS],
+    removedProviders: removedCleanup.removedProviders,
     apiKeysUpdated,
     inactiveDeleted: inactiveCleanup.deleted,
   };

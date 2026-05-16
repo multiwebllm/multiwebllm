@@ -4,6 +4,10 @@ import { models, providers, usageLogs, apiKeys } from "@/lib/db/schema";
 import { validateApiKey } from "@/lib/auth";
 import { eq, sql } from "drizzle-orm";
 import type { ChatOptions } from "@/lib/providers/base";
+import {
+  effectiveModelKind,
+  MODEL_KIND_LABELS,
+} from "@/lib/models/model-kind";
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -141,6 +145,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const modelKind = effectiveModelKind(modelRecord);
+  if (modelKind !== "chat") {
+    return NextResponse.json(
+      {
+        error: {
+          message: `Model '${body.model}' 为${MODEL_KIND_LABELS[modelKind]}模型，请使用 /v1/images/generations 等对应接口`,
+          type: "invalid_request_error",
+          code: "model_not_chat",
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   // Get provider
   const providerResults = await db
     .select()
@@ -189,7 +207,11 @@ export async function POST(request: NextRequest) {
     messages: body.messages,
     stream: body.stream !== false, // default true
     temperature: body.temperature,
-    max_tokens: body.max_tokens ?? modelRecord.maxTokens ?? undefined,
+    max_tokens:
+      body.max_tokens ??
+      (modelRecord.maxTokens != null && modelRecord.maxTokens > 0
+        ? modelRecord.maxTokens
+        : undefined),
   };
 
   const shouldStream = body.stream !== false;

@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
       upstreamModel: models.upstreamModel,
       supportsVision: models.supportsVision,
       supportsImageGen: models.supportsImageGen,
+      modelKind: models.modelKind,
       maxTokens: models.maxTokens,
+      contextWindow: models.contextWindow,
       status: models.status,
       createdAt: models.createdAt,
     })
@@ -44,7 +46,9 @@ export async function POST(request: NextRequest) {
     upstreamModel?: string;
     supportsVision?: boolean;
     supportsImageGen?: boolean;
-    maxTokens?: number;
+    modelKind?: string;
+    maxTokens?: number | null;
+    contextWindow?: number | null;
   };
 
   try {
@@ -70,7 +74,9 @@ export async function POST(request: NextRequest) {
         upstreamModel: body.upstreamModel,
         supportsVision: body.supportsVision ?? false,
         supportsImageGen: body.supportsImageGen ?? false,
-        maxTokens: body.maxTokens ?? 4096,
+        modelKind: body.modelKind ?? "chat",
+        maxTokens: body.maxTokens ?? null,
+        contextWindow: body.contextWindow ?? null,
       })
       .returning();
 

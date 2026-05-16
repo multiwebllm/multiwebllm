@@ -1,23 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { usageLogs, providers, models } from "@/lib/db/schema";
+import { usageLogs, providers, models, apiKeys } from "@/lib/db/schema";
 import { validateAdmin } from "@/lib/auth";
 import { eq, sql, gte, desc, and } from "drizzle-orm";
-import { createClient } from "redis";
-
-// 获取活跃连接数（从Redis统计）
-async function getActiveConnections(): Promise<number> {
-  try {
-    const client = createClient({ url: process.env.REDIS_URL });
-    await client.connect();
-    // 统计最近1分钟有活动的唯一连接标识
-    const keys = await client.keys("conn:*");
-    await client.disconnect();
-    return keys.length;
-  } catch {
-    return 0;
-  }
-}
 
 export async function GET(request: NextRequest) {
   if (!(await validateAdmin(request))) {
@@ -63,11 +48,11 @@ export async function GET(request: NextRequest) {
     requestTrend,
     tokenTrend,
     latencyTrend,
-    errorTrend,
     latencyDistribution,
     recentErrors,
-    providerHealth,
-    activeConnections,
+    providersOverview,
+    apiKeyTop,
+    activeKeyCountRow,
   ] = await Promise.all([
     // 请求/Token 汇总
     db
@@ -124,7 +109,6 @@ export async function GET(request: NextRequest) {
         tokens: sql<number>`coalesce(sum(${usageLogs.totalTokens}), 0)::int`,
         errors: sql<number>`count(*) filter (where ${usageLogs.status} = 'error')::int`,
         avgLatency: sql<number>`coalesce(avg(${usageLogs.latencyMs}), 0)::int`,
-        cost: sql<number>`coalesce(sum(${usageLogs.totalTokens} * 0.000002), 0)::numeric`,
       })
       .from(usageLogs)
       .leftJoin(providers, eq(usageLogs.providerId, providers.id))
@@ -221,29 +205,6 @@ export async function GET(request: NextRequest) {
         .orderBy(timeExpr);
     })(),
 
-    // 错误趋势
-    (() => {
-      const fmt =
-        range === "1min" || range === "5min"
-          ? "HH24:MI:SS"
-          : range === "30min" || range === "1h"
-          ? "HH24:MI"
-          : range === "6h"
-          ? "HH24:MI"
-          : "YYYY-MM-DD HH24:00";
-      const timeExpr = sql`to_char(${usageLogs.createdAt}, ${sql.raw(`'${fmt}'`)})`;
-      return db
-        .select({
-          time: sql<string>`${timeExpr}`,
-          errors: sql<number>`count(*) filter (where ${usageLogs.status} = 'error')::int`,
-          total: sql<number>`count(*)::int`,
-        })
-        .from(usageLogs)
-        .where(gte(usageLogs.createdAt, since))
-        .groupBy(timeExpr)
-        .orderBy(timeExpr);
-    })(),
-
     // 延迟分布直方图
     db
       .select({
@@ -300,19 +261,61 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(usageLogs.createdAt))
       .limit(20),
 
-    // Provider 健康状态
+    // 服务商概览（配置 + 时间窗内用量）
     db
       .select({
         id: providers.id,
         name: providers.name,
         slug: providers.slug,
         status: providers.status,
-        // responseTime: providers.responseTime,
+        lastCheckedAt: providers.lastCheckedAt,
+        requests: sql<number>`count(${usageLogs.id})::int`,
+        errors: sql<number>`count(*) filter (where ${usageLogs.status} = 'error')::int`,
+        avgLatency: sql<number>`coalesce(avg(${usageLogs.latencyMs}), 0)::int`,
       })
-      .from(providers),
+      .from(providers)
+      .leftJoin(
+        usageLogs,
+        and(
+          eq(usageLogs.providerId, providers.id),
+          gte(usageLogs.createdAt, since)
+        )
+      )
+      .groupBy(
+        providers.id,
+        providers.name,
+        providers.slug,
+        providers.status,
+        providers.lastCheckedAt
+      )
+      .orderBy(providers.name),
 
-    // 活跃连接数
-    getActiveConnections(),
+    // API Key 用量 Top
+    db
+      .select({
+        keyId: apiKeys.id,
+        keyName: apiKeys.name,
+        requests: sql<number>`count(*)::int`,
+        tokens: sql<number>`coalesce(sum(${usageLogs.totalTokens}), 0)::int`,
+      })
+      .from(usageLogs)
+      .innerJoin(apiKeys, eq(usageLogs.apiKeyId, apiKeys.id))
+      .where(gte(usageLogs.createdAt, since))
+      .groupBy(apiKeys.id, apiKeys.name)
+      .orderBy(desc(sql`count(*)`))
+      .limit(5),
+
+    db
+      .select({
+        count: sql<number>`count(distinct ${usageLogs.apiKeyId})::int`,
+      })
+      .from(usageLogs)
+      .where(
+        and(
+          gte(usageLogs.createdAt, since),
+          sql`${usageLogs.apiKeyId} is not null`
+        )
+      ),
   ]);
 
   const stats = requestStats[0];
@@ -347,8 +350,8 @@ export async function GET(request: NextRequest) {
       tokens: Number(stats.tokens),
       errors: stats.errors,
       successRate: Number(stats.successRate),
-      activeConnections,
       avgResponseTime: stats.avgResponseTime,
+      activeApiKeys: activeKeyCountRow[0]?.count ?? 0,
     },
     latency: {
       p50: latency.p50,
@@ -369,9 +372,9 @@ export async function GET(request: NextRequest) {
       cost: Number(Number(t.cost).toFixed(4)),
     })),
     latencyTrend,
-    errorTrend,
     errorDistribution: errorDistributionWithPercent,
     recentErrors,
-    providerHealth: providerHealth,
+    providersOverview,
+    apiKeyTop,
   });
 }

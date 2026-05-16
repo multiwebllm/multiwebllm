@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 
 export function SiteHeader() {
   const [stars, setStars] = useState<number | null>(null);
-  const [version, setVersion] = useState("0.0.1");
+  const [version, setVersion] = useState("0.0.2");
 
   useEffect(() => {
     fetch("https://api.multiwebllm.io/v1/version")

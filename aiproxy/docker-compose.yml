@@ -1,7 +1,37 @@
 services:
+  # 每次 up 前执行 schema 同步（db:push）；重建应用后若缺列请：docker compose run --rm multiwebllm-migrate
+  multiwebllm-migrate:
+    container_name: multiwebllm-migrate
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://multiwebllm:${DB_PASSWORD:-multiwebllm_secret}@multiwebllm-db:5432/multiwebllm
+    depends_on:
+      multiwebllm-db:
+        condition: service_healthy
+    networks:
+      - multiwebllm-net
+    command: sh -c "npm ci && npm run db:push"
+    restart: "no"
+
   multiwebllm-app:
     container_name: multiwebllm-app
     build: .
+    develop:
+      watch:
+        - path: ./src
+          action: rebuild
+        - path: ./public
+          action: rebuild
+        - path: ./package.json
+          action: rebuild
+        - path: ./package-lock.json
+          action: rebuild
+        - path: ./next.config.ts
+          action: rebuild
     ports:
       - "127.0.0.1:3000:3000"
     env_file: .env
@@ -12,6 +42,8 @@ services:
         condition: service_healthy
       multiwebllm-redis:
         condition: service_healthy
+      multiwebllm-migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - multiwebllm-net
@@ -77,6 +109,7 @@ services:
     networks:
       - multiwebllm-net
 
+  # 首次部署或需要重跑种子数据：docker compose --profile init run --rm multiwebllm-init
   multiwebllm-init:
     image: node:22-alpine
     working_dir: /app
@@ -90,7 +123,7 @@ services:
         condition: service_healthy
     networks:
       - multiwebllm-net
-    command: sh -c "npm ci && npm run db:push && npm run db:seed"
+    command: sh -c "npm ci && npm run db:seed"
     restart: "no"
     profiles:
       - init
