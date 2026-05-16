@@ -71,12 +71,12 @@ export default function HomePage() {
             等网页订阅转为 OpenAI 兼容 API，支持多密钥分发、用量统计、配额管理
           </p>
           <div className="mt-10 flex items-center justify-center gap-4">
-            <a
+            <Link
               href="/docs/getting-started"
               className="bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
             >
               开始使用
-            </a>
+            </Link>
             <a
               href="https://github.com/gentpan/multiwebllm"
               target="_blank"

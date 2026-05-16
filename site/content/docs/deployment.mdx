@@ -5,27 +5,32 @@ description: 生产环境部署 MultiWebLLM
 
 ## Docker Compose 部署
 
+在仓库**根目录**执行（`docker-compose.yml` 会包含 `aiproxy` 服务定义）：
+
 ### 基本部署
 
 ```bash
 git clone https://github.com/gentpan/multiwebllm.git
 cd multiwebllm
-cp .env.example .env
-# 编辑 .env 配置
-docker compose up -d
+cp aiproxy/.env.example aiproxy/.env
+# 编辑 aiproxy/.env：DB_PASSWORD、ADMIN_PASSWORD、JWT_SECRET
+
+docker compose up -d multiwebllm-db multiwebllm-redis
+docker compose --profile init run --rm multiwebllm-init
+docker compose up -d --build
 ```
 
 ### 查看日志
 
 ```bash
-docker compose logs -f
+docker compose logs -f multiwebllm-app
 ```
 
 ### 更新版本
 
 ```bash
-docker compose pull
-docker compose up -d
+git pull
+docker compose up -d --build
 ```
 
 ## Nginx 反向代理
@@ -122,12 +127,14 @@ ufw allow 443
 
 ## 数据备份
 
-数据库文件默认存储在 `./data/` 目录：
+PostgreSQL 数据保存在 Docker volume `multiwebllm-pgdata`：
 
 ```bash
-# 备份
-cp -r ./data ./data-backup-$(date +%Y%m%d)
+# 备份数据库
+docker exec multiwebllm-db pg_dump -U multiwebllm multiwebllm > backup-$(date +%Y%m%d).sql
 
-# 定时备份（crontab）
-0 3 * * * cp -r /path/to/multiwebllm/data /path/to/backup/data-$(date +\%Y\%m\%d)
+# 恢复
+cat backup.sql | docker exec -i multiwebllm-db psql -U multiwebllm multiwebllm
 ```
+
+Redis 数据在 volume `multiwebllm-redisdata`，可按需使用 `redis-cli SAVE` 或 RDB 文件备份。

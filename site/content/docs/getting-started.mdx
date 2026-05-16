@@ -21,32 +21,46 @@ cd multiwebllm
 ### 2. 配置环境变量
 
 ```bash
-cp .env.example .env
+cp aiproxy/.env.example aiproxy/.env
 ```
 
-编辑 `.env` 文件，设置关键配置：
+编辑 `aiproxy/.env`，设置关键配置：
 
 ```ini
-# 管理后台密码
+# 数据库密码（与 DB_PASSWORD 一致）
+DB_PASSWORD=your-secure-db-password
+DATABASE_URL=postgres://multiwebllm:your-secure-db-password@multiwebllm-db:5432/multiwebllm
+
+# 管理后台
+ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your-secure-password
 
-# 服务端口
-PORT=3000
+# JWT 会话密钥（随机字符串）
+JWT_SECRET=your-random-jwt-secret
 
-# 数据库路径
-DB_PATH=./data/db.sqlite
+# Redis
+REDIS_URL=redis://multiwebllm-redis:6379
 ```
 
 ### 3. 启动服务
 
+在仓库根目录执行：
+
 ```bash
-docker compose up -d
+# 启动 PostgreSQL 与 Redis
+docker compose up -d multiwebllm-db multiwebllm-redis
+
+# 初始化数据库表与种子数据（首次部署必须执行）
+docker compose --profile init run --rm multiwebllm-init
+
+# 构建并启动应用
+docker compose up -d --build
 ```
 
-等待容器启动完成后，访问管理后台：
+等待容器就绪后，访问管理后台：
 
 ```
-http://localhost:3000
+http://localhost:3000/login
 ```
 
 ### 4. 配置服务商
@@ -67,14 +81,14 @@ http://localhost:3000
 
 ## 第一次 API 调用
 
-使用生成的 API Key 发起请求：
+使用生成的 API Key 发起请求（`/v1` 会自动转发到 OpenAI 兼容接口）：
 
 ```bash
 curl http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-api-key" \
   -d '{
-    "model": "gpt-4o",
+    "model": "deepseek-chat",
     "messages": [
       {"role": "user", "content": "Hello!"}
     ]

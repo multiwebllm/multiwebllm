@@ -1,0 +1,3 @@
+# Run from repository root. Configure aiproxy/.env before starting.
+include:
+  - path: aiproxy/docker-compose.yml

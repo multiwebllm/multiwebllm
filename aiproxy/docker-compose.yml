@@ -1,0 +1,104 @@
+services:
+  multiwebllm-app:
+    container_name: multiwebllm-app
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file: .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://multiwebllm-redis:6379}
+    depends_on:
+      multiwebllm-db:
+        condition: service_healthy
+      multiwebllm-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - multiwebllm-net
+
+  # 每日触发一次；未满 health_check_interval_days（默认 7 天）时 API 内会跳过
+  multiwebllm-health-cron:
+    container_name: multiwebllm-health-cron
+    image: curlimages/curl:8.5.0
+    env_file: .env
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+    depends_on:
+      - multiwebllm-app
+    restart: unless-stopped
+    networks:
+      - multiwebllm-net
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "health-cron: daily provider check (interval enforced by API)"
+        while true; do
+          if [ -n "$$CRON_SECRET" ]; then
+            curl -fsS -m 120 -H "Authorization: Bearer $$CRON_SECRET" \
+              "http://multiwebllm-app:3000/api/cron/provider-health" \
+              || echo "health-cron: request failed"
+          else
+            echo "health-cron: CRON_SECRET not set, skipping"
+          fi
+          sleep 86400
+        done
+
+  multiwebllm-db:
+    container_name: multiwebllm-db
+    image: postgres:16-alpine
+    volumes:
+      - multiwebllm-pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: multiwebllm
+      POSTGRES_USER: multiwebllm
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-multiwebllm_secret}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U multiwebllm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - multiwebllm-net
+
+  multiwebllm-redis:
+    container_name: multiwebllm-redis
+    image: redis:8-alpine
+    volumes:
+      - multiwebllm-redisdata:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - multiwebllm-net
+
+  multiwebllm-init:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://multiwebllm:${DB_PASSWORD:-multiwebllm_secret}@multiwebllm-db:5432/multiwebllm
+    depends_on:
+      multiwebllm-db:
+        condition: service_healthy
+    networks:
+      - multiwebllm-net
+    command: sh -c "npm ci && npm run db:push && npm run db:seed"
+    restart: "no"
+    profiles:
+      - init
+
+networks:
+  multiwebllm-net:
+    driver: bridge
+
+volumes:
+  multiwebllm-pgdata:
+  multiwebllm-redisdata:

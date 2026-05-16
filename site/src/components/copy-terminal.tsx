@@ -5,8 +5,9 @@ import { Copy, Check } from "lucide-react";
 
 const code = `git clone https://github.com/gentpan/multiwebllm.git
 cd multiwebllm
-cp .env.example .env
-docker compose up -d`;
+cp aiproxy/.env.example aiproxy/.env
+docker compose up -d
+docker compose --profile init run --rm multiwebllm-init`;
 
 export function CopyTerminal() {
   const [copied, setCopied] = useState(false);
