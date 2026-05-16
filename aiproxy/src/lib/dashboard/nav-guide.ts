@@ -125,7 +125,7 @@ export const guidePageSections: GuidePageSection[] = [
     summary: "配置 ChatGPT / Claude / Gemini / Grok / Kimi 的 Cookie 或自定义 OpenAI 兼容端点。",
     setup: [
       "内置五家：选择预设 slug，填写与官网一致的基础地址（如 https://chatgpt.com）。",
-      "推荐安装 Cookie 桥接扩展，在浏览器登录后「一键获取」写入认证数据。",
+      "推荐安装 Cookie Editor，在浏览器登录目标站点后导出 JSON，再回到后台剪贴板导入。",
       "保存后点击「测试连接」确认 Cookie 有效。",
     ],
     configure: [
@@ -180,7 +180,7 @@ export const setupFlowSteps: GuideStep[] = [
   },
   {
     title: "2. 配置服务商",
-    body: "进入「服务商管理」，为每家填写基础地址并保存 Cookie（扩展一键获取或粘贴）。测试连接通过后再进行下一步。",
+    body: "进入「服务商管理」，为每家填写基础地址并保存 Cookie（推荐 Cookie Editor 导出 JSON 后剪贴板导入）。测试连接通过后再进行下一步。",
   },
   {
     title: "3. 同步模型",

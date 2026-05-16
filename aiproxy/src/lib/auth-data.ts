@@ -1,7 +1,7 @@
 import { stampAuthRecord } from "./auth-meta";
 
 /**
- * 解析/压缩 Cookie 导入（浏览器扩展 JSON、Cookie 字符串等）
+ * 解析/压缩 Cookie 导入（Cookie Editor JSON、Cookie 字符串等）
  */
 
 export interface CustomEndpoints {

@@ -15,7 +15,7 @@ MultiWebLLM 把「浏览器里已登录的 AI 网页会话」搬到服务器上�
 | 模块 | 能力 |
 |------|------|
 | **OpenAI API** | `GET /v1/models`、`POST /v1/chat/completions`（流式）、图片生成（部分模型） |
-| **服务商管理** | Cookie / Token 配置、连接测试、Cookie 桥接扩展 |
+| **服务商管理** | Cookie / Token 配置、连接测试、Cookie JSON 导入 |
 | **模型配置** | 从官网拉取模型列表，仅保留最新主版本档；清理旧版/无关模型 |
 | **API 密钥** | 多 Key、配额、每分钟限流 |
 | **运维** | 用量记录、监控图表、侧栏官网延迟（ms） |
@@ -165,13 +165,14 @@ curl http://localhost:3000/v1/models \
 
 ## 配置 Cookie（详细）
 
-### 方式 A：浏览器扩展（推荐）
+### 方式 A：Cookie Editor（推荐）
 
-1. 加载 [`../extensions/multiwebllm-cookie-bridge`](../extensions/multiwebllm-cookie-bridge/)
+1. 安装 [Cookie Editor](https://chromewebstore.google.com/detail/cookie-editor/ookdjilphngeeeghgngjabigmpepanpl?hl=zh-CN&utm_source=ext_sidebar)
 2. 服务商页填写正确 **基础地址**（如 `https://chatgpt.com`）
-3. 在 Chrome 登录该站后点击 **扩展一键获取**
+3. 在 Chrome 登录该站后，用 Cookie Editor 导出 JSON
+4. 回到后台使用 **剪贴板导入** 或直接粘贴
 
-扩展导出格式与 Cookie Editor JSON 兼容；后台会按域名过滤并压缩存储。
+后台会按基础地址域名过滤 Cookie，并压缩存储。
 
 ### 方式 B：手动粘贴
 
@@ -183,9 +184,9 @@ curl http://localhost:3000/v1/models \
 
 解析逻辑见 [`src/lib/auth-data.ts`](src/lib/auth-data.ts)。
 
-### 方式 C：授权弹窗
+### 方式 C：登录弹窗辅助
 
-**打开登录页** → 在新窗口完成登录 → **登录后获取 Cookie**（依赖扩展）。
+**打开登录页** → 在新窗口完成登录 → 用 Cookie Editor 导出 JSON → 回到后台导入。
 
 ## 项目结构
 

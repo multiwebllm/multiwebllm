@@ -43,10 +43,7 @@ import {
   FlaskConical,
   Loader2,
   ExternalLink,
-  Copy,
-  Check,
   ClipboardPaste,
-  Puzzle,
 } from "lucide-react";
 import {
   normalizeAuthInput,
@@ -60,12 +57,6 @@ import {
   isWebChatProvider,
   validateCustomProviderSlug,
 } from "@/lib/models/catalog";
-import {
-  fetchCookieJsonForUrl,
-  discoverCookieBridge,
-  openAuthLoginPopup,
-  EXTENSION_INSTALL_PATH,
-} from "@/lib/cookie-bridge/client";
 
 interface Provider {
   id: string;
@@ -85,6 +76,10 @@ type ProviderForm = Omit<Provider, "id" | "lastCheckedAt"> & {
 
 const DEFAULT_CHAT_ENDPOINT = "/v1/chat/completions";
 const DEFAULT_MODELS_ENDPOINT = "/v1/models";
+const COOKIE_EDITOR_URL =
+  "https://chromewebstore.google.com/detail/cookie-editor/ookdjilphngeeeghgngjabigmpepanpl?hl=zh-CN&utm_source=ext_sidebar";
+const POPUP_FEATURES =
+  "popup=yes,width=520,height=780,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes";
 
 const emptyForm: ProviderForm = {
   name: "",
@@ -123,6 +118,11 @@ function buildAuthPayload(form: ProviderForm, template: string): string {
     };
   }
   return serializeAuthData(normalized);
+}
+
+function openAuthPopupWindow(url: string) {
+  if (typeof window === "undefined") return;
+  window.open(url, "multiwebllm_auth", POPUP_FEATURES);
 }
 
 // 预设服务商模板（内置网页订阅聊天）
@@ -193,12 +193,8 @@ export default function ProvidersPage() {
   } | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showAuthJson, setShowAuthJson] = useState(false);
-  const [bridgeFetching, setBridgeFetching] = useState(false);
-  const [bridgeReady, setBridgeReady] = useState<boolean | null>(null);
-  const [authPopupOpened, setAuthPopupOpened] = useState(false);
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -217,21 +213,6 @@ export default function ProvidersPage() {
   useEffect(() => {
     fetchProviders();
   }, [fetchProviders]);
-
-  useEffect(() => {
-    if (!dialogOpen || form.authType !== "cookie") return;
-    let cancelled = false;
-    discoverCookieBridge(1500)
-      .then(() => {
-        if (!cancelled) setBridgeReady(true);
-      })
-      .catch(() => {
-        if (!cancelled) setBridgeReady(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dialogOpen, form.authType]);
 
   function openAdd() {
     setEditingId(null);
@@ -300,38 +281,22 @@ export default function ProvidersPage() {
       alert("请先选择服务商或填写基础地址");
       return;
     }
-    setAuthPopupOpened(false);
     setAuthError(null);
     setAuthDialogOpen(true);
   }
 
-  /** 弹窗打开登录页（扩展 popup 或 window.open） */
-  async function startAuthPopupLogin() {
+  function openCookieEditorStore() {
+    if (typeof window === "undefined") return;
+    window.open(COOKIE_EDITOR_URL, "_blank", "noopener,noreferrer");
+  }
+
+  function startAuthPopupLogin() {
     if (!form.baseUrl) {
       setAuthError("请先填写基础地址");
       return;
     }
     setAuthError(null);
-    try {
-      const { usedExtension } = await openAuthLoginPopup(form.baseUrl);
-      setAuthPopupOpened(true);
-      setBridgeReady(usedExtension);
-    } catch (err) {
-      setAuthError(err instanceof Error ? err.message : "无法打开登录窗口");
-    }
-  }
-
-  /** 登录完成后获取 Cookie（需已安装扩展） */
-  async function completeAuthAfterLogin() {
-    await fetchCookiesFromExtension();
-  }
-
-  // 复制书签代码
-  async function copyBookmarkCode() {
-    const code = `javascript:(function(){const c=document.cookie;navigator.clipboard.writeText(JSON.stringify({cookies:c,url:location.href},null,2)).then(()=>alert('Cookie已复制!请粘贴到后台')).catch(()=>prompt('复制失败，请手动复制:',c));})();`;
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    openAuthPopupWindow(form.baseUrl);
   }
 
   function applyAuthImport(raw: string) {
@@ -365,27 +330,6 @@ export default function ProvidersPage() {
       applyAuthImport(text);
     } catch {
       setAuthError("无法读取剪贴板，请手动粘贴");
-    }
-  }
-
-  async function fetchCookiesFromExtension() {
-    if (!form.baseUrl) {
-      setAuthError("请先填写基础地址");
-      return;
-    }
-    setBridgeFetching(true);
-    setAuthError(null);
-    try {
-      const { json } = await fetchCookieJsonForUrl(form.baseUrl);
-      applyAuthImport(json);
-      setBridgeReady(true);
-    } catch (err) {
-      setBridgeReady(false);
-      setAuthError(
-        err instanceof Error ? err.message : "扩展获取 Cookie 失败"
-      );
-    } finally {
-      setBridgeFetching(false);
     }
   }
 
@@ -685,21 +629,6 @@ export default function ProvidersPage() {
                     <>
                       <Button
                         type="button"
-                        variant="default"
-                        size="sm"
-                        onClick={fetchCookiesFromExtension}
-                        disabled={bridgeFetching || !form.baseUrl}
-                        className="h-7 text-xs"
-                      >
-                        {bridgeFetching ? (
-                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        ) : (
-                          <Puzzle className="mr-1 h-3 w-3" />
-                        )}
-                        扩展一键获取
-                      </Button>
-                      <Button
-                        type="button"
                         variant="outline"
                         size="sm"
                         onClick={pasteFromClipboard}
@@ -717,7 +646,29 @@ export default function ProvidersPage() {
                           className="h-7 text-xs"
                         >
                           <ExternalLink className="mr-1 h-3 w-3" />
-                          一键授权
+                          登录与导入说明
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={openCookieEditorStore}
+                        className="h-7 text-xs"
+                      >
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        安装 Cookie Editor
+                      </Button>
+                      {form.baseUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={startAuthPopupLogin}
+                          className="h-7 text-xs"
+                        >
+                          <ExternalLink className="mr-1 h-3 w-3" />
+                          打开登录页
                         </Button>
                       )}
                     </>
@@ -783,15 +734,32 @@ export default function ProvidersPage() {
               {authError && (
                 <p className="text-xs text-destructive">{authError}</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                {form.authType === "cookie"
-                  ? bridgeReady === false
-                    ? `推荐安装项目内 ${EXTENSION_INSTALL_PATH} 扩展后使用「扩展一键获取」（兼容 Cookie Editor JSON）`
-                    : "已检测到 Cookie Bridge 扩展；也支持 Cookie Editor 导出后剪贴板导入"
-                  : form.authType === "token"
+              {form.authType === "cookie" ? (
+                <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  <p>
+                    推荐安装{" "}
+                    <a
+                      href={COOKIE_EDITOR_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      Cookie Editor
+                    </a>
+                    ，在目标站点登录后导出 JSON，再回到这里点「剪贴板导入」。
+                  </p>
+                  <p className="mt-1">
+                    支持 Cookie Editor JSON 数组、{`{"cookies": {...}}`} 对象或普通
+                    `name=value` Cookie 字符串。
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {form.authType === "token"
                     ? "请输入 Bearer Token"
                     : "请输入 API Key"}
-              </p>
+                </p>
+              )}
             </div>
 
             <div className="grid gap-2">
@@ -825,13 +793,13 @@ export default function ProvidersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Auth Dialog - 一键授权 */}
+      {/* Auth Dialog - Cookie 导入引导 */}
       <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
         <DialogContent className="flex max-h-[min(85vh,560px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
           <DialogHeader className="shrink-0 px-6 pt-6 pb-2">
-            <DialogTitle>🔐 授权登录 - {form.name || "服务商"}</DialogTitle>
+            <DialogTitle>🔐 Cookie 导入 - {form.name || "服务商"}</DialogTitle>
             <DialogDescription>
-              在弹出窗口中登录，完成后一键拉回 Cookie（推荐安装 Cookie Bridge 扩展）。
+              在目标站点登录后，用 Cookie Editor 导出 JSON，再回到后台导入。
             </DialogDescription>
           </DialogHeader>
           
@@ -839,7 +807,7 @@ export default function ProvidersPage() {
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
               <p className="text-sm text-muted-foreground">
                 受浏览器安全策略限制，管理后台网页无法直接读取 Gemini/Google 等站点的
-                Cookie。弹窗仅用于登录；自动抓取需扩展或剪贴板导入。
+                Cookie。推荐流程是登录目标站点后，用 Cookie Editor 导出 JSON 并剪贴板导入。
               </p>
               <div className="flex flex-col gap-2">
                 <Button
@@ -848,63 +816,38 @@ export default function ProvidersPage() {
                   onClick={startAuthPopupLogin}
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  {authPopupOpened ? "重新打开登录弹窗" : "1. 打开登录弹窗"}
+                  1. 打开登录页
                 </Button>
                 <Button
                   type="button"
                   className="w-full"
-                  variant={authPopupOpened ? "default" : "secondary"}
-                  onClick={completeAuthAfterLogin}
-                  disabled={bridgeFetching || !authPopupOpened}
+                  variant="secondary"
+                  onClick={openCookieEditorStore}
                 >
-                  {bridgeFetching ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Puzzle className="mr-2 h-4 w-4" />
-                  )}
-                  2. 我已登录，获取 Cookie
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  2. 安装 Cookie Editor
+                </Button>
+                <p>
+                  3. 在该站点导出 Cookie Editor JSON，然后复制到剪贴板
+                </p>
+                <Button type="button" variant="outline" onClick={pasteFromClipboard}>
+                  <ClipboardPaste className="mr-2 h-4 w-4" />
+                  4. 从剪贴板导入 JSON
                 </Button>
               </div>
-              {authPopupOpened && bridgeReady === false && (
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  未检测到扩展时无法自动获取。请安装{" "}
-                  <code className="rounded bg-muted px-1">{EXTENSION_INSTALL_PATH}</code>
-                  ，或使用下方剪贴板导入。
-                </p>
-              )}
               {authError && (
                 <p className="text-xs text-destructive">{authError}</p>
               )}
             </div>
 
-            <details className="rounded-lg border p-4 text-sm">
-              <summary className="cursor-pointer font-medium">
-                无扩展时的备选方式
-              </summary>
-              <div className="mt-3 space-y-2 text-muted-foreground">
-                <p>
-                  在登录弹窗对应站点用 Cookie Editor 导出 JSON，再点「剪贴板导入」。
-                </p>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={copyBookmarkCode}
-                  >
-                    {copied ? (
-                      <><Check className="mr-1 h-3 w-3" /> 已复制书签</>
-                    ) : (
-                      <><Copy className="mr-1 h-3 w-3" /> 复制书签代码</>
-                    )}
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={pasteFromClipboard}>
-                    <ClipboardPaste className="mr-2 h-4 w-4" />
-                    从剪贴板导入
-                  </Button>
-                </div>
-              </div>
-            </details>
+            <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">支持的导入格式</p>
+              <ul className="mt-2 space-y-1">
+                <li>Cookie Editor 导出的 JSON 数组</li>
+                <li>{`{"cookies": {...}}`} 形式的对象</li>
+                <li>普通 `name=value; name2=value2` Cookie 字符串</li>
+              </ul>
+            </div>
           </div>
 
           <DialogFooter className="shrink-0 border-t px-6 py-4">

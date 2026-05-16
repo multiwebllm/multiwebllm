@@ -44,7 +44,6 @@ flowchart LR
 | 目录 | 说明 |
 |------|------|
 | [`aiproxy/`](aiproxy/) | 核心：API、管理后台、Docker |
-| [`extensions/multiwebllm-cookie-bridge/`](extensions/multiwebllm-cookie-bridge/) | Chrome 扩展：一键导出 Cookie |
 | [`site/`](site/) | 官网与文档站点 |
 
 ## 快速开始（Docker）
@@ -67,7 +66,7 @@ docker compose up -d --build
 
 ### 推荐配置顺序
 
-1. **服务商管理** — 填入 Cookie（扩展一键获取 / Cookie Editor JSON / 剪贴板），点 **测试**
+1. **服务商管理** — 填入 Cookie（推荐 Cookie Editor JSON / 剪贴板），点 **测试**
 2. **模型配置** — **同步模型**（需有效 Cookie）
 3. **API 密钥** — 创建 `sk-...`，在应用里当 OpenAI API Key 使用
 4. **系统设置**（可选）— Telegram 通知、巡检间隔、限流等
@@ -94,9 +93,10 @@ curl http://127.0.0.1:3000/v1/chat/completions \
 
 ## Cookie 获取
 
-1. 安装 [`multiwebllm-cookie-bridge`](extensions/multiwebllm-cookie-bridge/) 扩展（开发者模式加载）
-2. 在 Chrome 中登录对应 AI 网站
-3. 打开 **服务商管理** → 编辑服务商 → **扩展一键获取** 或粘贴 Cookie Editor 导出的 JSON
+1. 在 Chrome 安装 [Cookie Editor](https://chromewebstore.google.com/detail/cookie-editor/ookdjilphngeeeghgngjabigmpepanpl?hl=zh-CN&utm_source=ext_sidebar)
+2. 在对应 AI 网站完成登录
+3. 用 Cookie Editor 导出 JSON
+4. 打开 **服务商管理** → 编辑服务商 → 粘贴或使用 **剪贴板导入**
 
 ## 本地开发
 
@@ -119,7 +119,6 @@ Next.js 16 · TypeScript · PostgreSQL · Redis · Drizzle · shadcn/ui · Docke
 ## 文档
 
 - 实现细节与数据流：[`aiproxy/README.md`](aiproxy/README.md)
-- 扩展说明：[`extensions/multiwebllm-cookie-bridge/README.md`](extensions/multiwebllm-cookie-bridge/README.md)
 
 ## 免责声明
 
